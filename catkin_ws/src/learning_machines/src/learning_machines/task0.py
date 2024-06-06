@@ -10,7 +10,7 @@ from robobo_interface import (
 )
 
 
-def do_task0(rob: IRobobo, duration=30000):
+def do_task0(rob: IRobobo, duration=60000):
     '''
     does everything needed to demo task0
     :param rob: robobo object
@@ -22,16 +22,15 @@ def do_task0(rob: IRobobo, duration=30000):
         rob.play_simulation()
 
     direction = 1  # 1 = go in front, -1 = go backwards, 0 = stop
-    # loop over 0.2 sec (can be reduced)
+    # loop over 0.5 sec (can be reduced)
     while duration > 0:
-        if isinstance(rob, SimulationRobobo):
-            rob.reset_wheels()
-        rob.move(100 * direction, 100 * direction, 200)
         sensor_data = rob.read_irs()
         new_dir = react_to_sensors(sensor_data)
         if new_dir is not None:
             direction = new_dir
-        duration -= 200
+
+        rob.move(100 * direction, 100 * direction, 500)
+        duration -= 500
 
     if isinstance(rob, SimulationRobobo):
         rob.stop_simulation()
@@ -54,8 +53,8 @@ def react_to_sensors(sensor_data):
     backC = sensor_data[6]
     frontLL = sensor_data[7]
 
-    if frontL > 100 or frontR > 100 or frontC > 100:  # or frontRR > 100 or frontLL > 100
+    if frontL > 80 or frontR > 80 or frontC > 100:  # or frontRR > 100 or frontLL > 100
         return -1
-    if backL > 100 or backR > 100 or backC > 100:
+    if backL > 80 or backR > 80 or backC > 100:
         return 1
     return None
