@@ -6,4 +6,4 @@
 ${1:?"Specify the scene you want to load as a first argument"}
 
 # Presumes you have CoppeliaSim extracted to ./coppeliaSim.app
-./coppeliaSim.app/Contents/MacOS/coppeliaSim "$1" $3 "-GzmqRemoteApi.rpcPort=${2:-23000}"
+sudo ./coppeliaSim.app/Contents/MacOS/coppeliaSim "$1" $3 "-GzmqRemoteApi.rpcPort=${2:-23000}"
