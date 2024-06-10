@@ -19,7 +19,10 @@ if __name__ == "__main__":
     else:
         raise ValueError(f"{sys.argv[1]} is not a valid argument.")
 
+    # Testing
     # run_all_actions(rob)
+
+    # TASK 0
     print("Start")
     do_task0(rob)
     print("Finish")

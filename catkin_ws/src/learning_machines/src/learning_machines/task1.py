@@ -10,7 +10,7 @@ from robobo_interface import (
 )
 
 
-def do_task0(rob: IRobobo, duration=30000):
+def run_task1(rob: IRobobo, duration=30000):
     '''
     does everything needed to demo task0
     :param rob: robobo object
@@ -26,36 +26,13 @@ def do_task0(rob: IRobobo, duration=30000):
     while duration > 0:
         if isinstance(rob, SimulationRobobo):
             rob.reset_wheels()
-        rob.move(100 * direction, 100 * direction, 200)
-        sensor_data = rob.read_irs()
-        new_dir = react_to_sensors(sensor_data)
-        if new_dir is not None:
-            direction = new_dir
+        # read sensory data
+        sensor_da   ta = rob.read_irs()
+        # preprocess it
+
+        #
         duration -= 200
 
     if isinstance(rob, SimulationRobobo):
         rob.stop_simulation()
 
-
-def react_to_sensors(sensor_data):
-    """
-    return new direction value depending on the sensor data
-    :param sensor_data: iris data
-    :return: new direction
-    """
-    # sensor_data = [BackL, BackR, FrontL, FrontR, FrontC, FrontRR, BackC, FrontLL]
-    # "enumerate" the data
-    backL = sensor_data[0]
-    backR = sensor_data[1]
-    frontL = sensor_data[2]
-    frontR = sensor_data[3]
-    frontC = sensor_data[4]
-    frontRR = sensor_data[5]
-    backC = sensor_data[6]
-    frontLL = sensor_data[7]
-
-    if frontL > 100 or frontR > 100 or frontC > 100:  # or frontRR > 100 or frontLL > 100
-        return -1
-    if backL > 100 or backR > 100 or backC > 100:
-        return 1
-    return None
