@@ -8,9 +8,10 @@ from robobo_interface import (
     SimulationRobobo,
     HardwareRobobo,
 )
+from matplotlib import pyplot as plt
 
 
-def do_task0(rob: IRobobo, duration=60000):
+def do_task0(rob: IRobobo, duration=20000):
     '''
     does everything needed to demo task0
     :param rob: robobo object
@@ -21,6 +22,9 @@ def do_task0(rob: IRobobo, duration=60000):
     if isinstance(rob, SimulationRobobo):
         rob.play_simulation()
 
+    sensor_data_list = []
+    direction_list = []
+
     direction = 1  # 1 = go in front, -1 = go backwards, 0 = stop
     # loop over 0.5 sec (can be reduced)
     while duration > 0:
@@ -29,11 +33,43 @@ def do_task0(rob: IRobobo, duration=60000):
         if new_dir is not None:
             direction = new_dir
 
-        rob.move(100 * direction, 100 * direction, 500)
-        duration -= 500
+        rob.move(100 * direction, 100 * direction, 200)
+        duration -= 200
+
+        # Collect data
+        sensor_data_list.append(sensor_data)
+        direction_list.append(direction)
 
     if isinstance(rob, SimulationRobobo):
         rob.stop_simulation()
+
+    # Plot results
+    plot_data(sensor_data_list, direction_list)
+
+
+def plot_data(sensor_data_list, direction_list):
+    # Transpose the data to separate each sensor's readings
+    data_transposed = list(zip(*sensor_data_list))
+
+    # Sensor names
+    sensors = ["BackL", "BackR", "FrontL", "FrontR", "FrontC", "FrontRR", "BackC", "FrontLL"]
+
+    time_points = list(range(1, len(sensor_data_list) + 1))
+
+    # Plotting the data
+    plt.figure(figsize=(12, 8))
+    for i, sensor in enumerate(sensors):
+        plt.plot(time_points, data_transposed[i], label=sensor)
+
+    plt.xlabel('Time (seconds)')
+    plt.ylabel('Sensor Readings')
+    plt.title('Sensor Data Over Time')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+    # Show plot
+    plt.savefig(str(FIGRURES_DIR / "plot1.png"))
+    plt.show()
 
 
 def react_to_sensors(sensor_data):
