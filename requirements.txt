@@ -5,3 +5,6 @@ numpy~=1.24
 opencv-python~=4.8
 matplotlib
 pandas
+gym
+stable_baselines3
+shimmy
