@@ -2,8 +2,6 @@ import gym
 from gym import spaces
 import numpy as np
 from robobo_interface import IRobobo, SimulationRobobo
-
-
 class RoboboEnv(gym.Env):
     def __init__(self, robobo: IRobobo):
         super(RoboboEnv, self).__init__()
@@ -22,7 +20,6 @@ class RoboboEnv(gym.Env):
 
         if isinstance(self.robobo, SimulationRobobo):
             self.robobo.play_simulation()
-
     def reset(self):
         # Reset the state of the environment to an initial state
         # Implement any reset logic if required
@@ -60,16 +57,16 @@ class RoboboEnv(gym.Env):
         self.robobo.move(100 * left_motor, 100 * right_motor, 200)
 
         # TODO save this to the observation space, clip IR values to 0, 100
-        # current implementation regards anything above 100 as identical to 200- something to think about
-        sensor_data = np.clip(self.robobo.read_irs(), 0, 200)
+        # current implementation regards anything above 100 as identical to 100- something to think about
+        sensor_data = np.clip(self.robobo.read_irs(), 0, 100)
 
         # Reward logic based on sensor data
         # reward low sensor data and fast movement
         # need to find a better way for both motor and sensor data computation
-        reward = abs(left_motor + right_motor) * (1 - (np.avg(sensor_data) / 100))
+        reward = abs(left_motor+right_motor) * (1 - (np.avg(sensor_data)/100))
 
         # collision punishment, I'm assuming 100 is collision but this is MOST LIKELY not true.
-        if any(data > 99 for data in sensor_data):
+        if any(data>99 for data in sensor_data):
             reward = -10
 
         # TODO define termination condition- implement a timer for the simulator maybe
@@ -77,5 +74,9 @@ class RoboboEnv(gym.Env):
 
         return np.concatenate((np.array([left_motor, right_motor]), np.array(sensor_data))), reward, done, {}
 
+    def render(self, mode='human', close=False):
+        pass
+
     def close(self):
-        self.robobo.stop_simulation()
+        if isinstance(self.robobo, SimulationRobobo):
+            self.robobo.stop_simulation()
