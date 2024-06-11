@@ -27,7 +27,7 @@ def run_task1(rob: IRobobo, duration=30000):
         if isinstance(rob, SimulationRobobo):
             rob.reset_wheels()
         # read sensory data
-        sensor_da   ta = rob.read_irs()
+        sensor_data = rob.read_irs()
         # preprocess it
 
         #
