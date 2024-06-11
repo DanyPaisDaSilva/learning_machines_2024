@@ -74,5 +74,9 @@ class RoboboEnv(gym.Env):
 
         return np.concatenate((np.array([left_motor, right_motor]), np.array(sensor_data))), reward, done, {}
 
+    def render(self, mode='human', close=False):
+        pass
+
     def close(self):
-        self.robobo.stop_simulation()
+        if isinstance(self.robobo, SimulationRobobo):
+            self.robobo.stop_simulation()
