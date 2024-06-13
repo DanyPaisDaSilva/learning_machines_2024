@@ -164,7 +164,7 @@ def run_task1(rob: IRobobo):
 
 
         # Create the RL model
-        model = DQN("MlpPolicy", env, verbose=1)
+        model = DQN("MlpPolicy", env, verbose=1, **config_default)
 
         # Train the model
         model.learn(total_timesteps=2000)
