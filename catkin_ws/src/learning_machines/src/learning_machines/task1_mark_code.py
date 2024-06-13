@@ -26,8 +26,8 @@ class RoboboEnv(gym.Env):
         self.collision_threshold = collision_threshold
 
         # Define action and observation space
-        # Actions: 0 (stop), 1 (forward), 2 (backward), 3 (turn 45 left), 4 (turn 45 right)
-        self.action_space = spaces.Discrete(5)
+        # Actions: 0 (forward), 1 (backward), 2 (turn 45 left), 3 (turn 45 right)
+        self.action_space = spaces.Discrete(4)
 
         # Observation: First 2 are the motor speeds, the other 8 are IR sensor readings
         # CHECK THE ORDER OF THE SENSORS!
@@ -43,14 +43,12 @@ class RoboboEnv(gym.Env):
         return np.array(sensor_data)
 
     def translate_action(self, action):
+        # move backward
         if action == 0:
-            return 0, 0
-            # move forward
+            return -1, -1
+        # move forward
         elif action == 1:
             return 1, 1
-        # move backward
-        elif action == -1:
-            return -1, -1
         # turn 45 degrees left
         elif action == 2:
             return 0.5, -0.5
