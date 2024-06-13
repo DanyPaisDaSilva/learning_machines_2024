@@ -3,6 +3,7 @@ from gym import spaces
 from stable_baselines3 import DQN
 from stable_baselines3.common.noise import NormalActionNoise
 import numpy as np
+from matplotlib import pyplot as plt
 from data_files import FIGRURES_DIR
 from robobo_interface import (
     IRobobo,
@@ -16,7 +17,7 @@ from robobo_interface import (
 
 
 class RoboboEnv(gym.Env):
-    def __init__(self, robobo: IRobobo, collision_threshold=400):
+    def __init__(self, robobo: IRobobo, collision_threshold=1000):
         super(RoboboEnv, self).__init__()
         self.robobo = robobo
 
@@ -91,13 +92,13 @@ class RoboboEnv(gym.Env):
         return 0, 0
 
     def step(self, action):
-        # Execute one time step within the environment
 
+        # Execute one time step within the environment
         left_motor, right_motor = self.translate_action_test(action)
 
         # execute the action
         blockid = self.robobo.move(100 * left_motor, 100 * right_motor, 200)
-        self.robobo.is_blocked(blockid)
+        self.robobo._used_pids.remove(blockid)
 
         # TODO save this to the observation space, clip IR values to 0, 100
         # current implementation regards anything above 100 as identical to 100- something to think about
@@ -113,13 +114,18 @@ class RoboboEnv(gym.Env):
         # need to find a better way for both motor and sensor data computation
         forward_bonus = 2 if action == 1 else 0
         reward = ((abs(left_motor + right_motor) * (1 - (np.max(sensor_data) / self.collision_threshold)))
-                  - 20 * len(sensor_data[sensor_data == self.collision_threshold])
+                  - 2 * len(sensor_data[sensor_data == self.collision_threshold])
                   + forward_bonus)
 
         print(f"ACTION {action},\nSENSOR DATA: {sensor_data},\n REWARD: {reward}")
 
         # TODO define termination condition- implement a timer for the simulator maybe
         done = False
+
+
+        # plot stuff
+        self.track_reward.append(reward)
+        self.track_sensors.append(sensor_data)
 
         return np.array(sensor_data), reward, done, {}
 
@@ -136,9 +142,7 @@ def run_task1(rob: IRobobo):
     if isinstance(rob, SimulationRobobo):
         rob.play_simulation()
 
-    try:
         env = RoboboEnv(rob)
-        env_name = "RoboboEnv_Test"
 
         n_actions = env.action_space.n
         action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
@@ -163,7 +167,7 @@ def run_task1(rob: IRobobo):
         model = DQN("MlpPolicy", env, verbose=1)
 
         # Train the model
-        model.learn(total_timesteps=1000)
+        model.learn(total_timesteps=2000)
 
         # Save the model
         # model.save(str(FIGRURES_DIR / "ddpg_robobo"+f"{time.time()}"))
@@ -173,9 +177,57 @@ def run_task1(rob: IRobobo):
         env.close()
         print("is done?")
 
+    # plot the plots
+    plot_sensor_data(env.track_sensors)
+    plot_reward(env.track_reward)
+
     # except Exception as e:
     #    print(e)
+    if isinstance(rob, SimulationRobobo):
+        rob.stop_simulation()
 
-    finally:
-        if isinstance(rob, SimulationRobobo):
-            rob.stop_simulation()
+
+def plot_sensor_data(sensor_data_list):
+    # Transpose the data to separate each sensor's readings
+    data_transposed = list(zip(*sensor_data_list))
+
+    # Sensor names
+    sensors = ["BackL", "BackR", "FrontL", "FrontR", "FrontC", "FrontRR", "BackC", "FrontLL"]
+
+    time_points = list(range(1, len(sensor_data_list) + 1))
+
+    # Plotting the data
+    plt.figure(figsize=(16, 12))
+    for i, sensor in enumerate(sensors):
+        plt.plot(time_points, data_transposed[i], label=sensor)
+
+    plt.xlabel('Timestep')
+    plt.ylabel('Sensor Readings')
+    plt.title('Sensor Data Over Timesteps')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+    # Show plot
+    plt.savefig(str(FIGRURES_DIR / "sensor_data.png"))
+    plt.show()
+
+
+def plot_reward(reward_data_list):
+
+    time_points = list(range(1, len(reward_data_list) + 1))
+
+    # Plotting the data
+    plt.figure(figsize=(12, 8))
+    plt.plot(time_points, reward_data_list)
+
+    plt.xlabel('Timestep')
+    plt.ylabel('Reward')
+    plt.title('Reward Data Over Timesteps')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+    # Show plot
+    plt.savefig(str(FIGRURES_DIR / "reward_data.png"))
+    plt.show()

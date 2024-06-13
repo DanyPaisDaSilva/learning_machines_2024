@@ -67,6 +67,7 @@ def plot_data(sensor_data_list, direction_list):
     plt.legend()
     plt.grid(True)
     plt.show()
+
     # Show plot
     plt.savefig(str(FIGRURES_DIR / "plot1.png"))
     plt.show()
