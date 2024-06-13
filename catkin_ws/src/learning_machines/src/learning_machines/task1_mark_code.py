@@ -26,7 +26,7 @@ class RoboboEnv(gym.Env):
 
         # Define action and observation space
         # Actions: 0 (forward), 1 (backward), 2 (turn 45 left), 3 (turn 45 right)
-        self.action_space = spaces.Discrete(5)
+        self.action_space = spaces.Discrete(4)
 
         # Observation: First 2 are the motor speeds, the other 8 are IR sensor readings
         # CHECK THE ORDER OF THE SENSORS!
@@ -94,7 +94,7 @@ class RoboboEnv(gym.Env):
     def step(self, action):
 
         # Execute one time step within the environment
-        left_motor, right_motor = self.translate_action_test(action)
+        left_motor, right_motor = self.translate_action(action)
 
         # execute the action
         blockid = self.robobo.move(100 * left_motor, 100 * right_motor, 200)
@@ -114,14 +114,13 @@ class RoboboEnv(gym.Env):
         # need to find a better way for both motor and sensor data computation
         forward_bonus = 2 if action == 1 else 0
         reward = ((abs(left_motor + right_motor) * (1 - (np.max(sensor_data) / self.collision_threshold)))
-                  - 2 * len(sensor_data[sensor_data == self.collision_threshold])
+                  - 5 * len(sensor_data[sensor_data == self.collision_threshold])
                   + forward_bonus)
 
         print(f"ACTION {action},\nSENSOR DATA: {sensor_data},\n REWARD: {reward}")
 
         # TODO define termination condition- implement a timer for the simulator maybe
         done = False
-
 
         # plot stuff
         self.track_reward.append(reward)
@@ -167,7 +166,7 @@ def run_task1(rob: IRobobo):
         model = DQN("MlpPolicy", env, verbose=1)
 
         # Train the model
-        model.learn(total_timesteps=2000)
+        model.learn(total_timesteps=500)
 
         # Save the model
         # model.save(str(FIGRURES_DIR / "ddpg_robobo"+f"{time.time()}"))
@@ -175,7 +174,6 @@ def run_task1(rob: IRobobo):
         # Load the model
         # model = DQN.load("ddpg_robobo")
         env.close()
-        print("is done?")
 
     # plot the plots
     plot_sensor_data(env.track_sensors)
