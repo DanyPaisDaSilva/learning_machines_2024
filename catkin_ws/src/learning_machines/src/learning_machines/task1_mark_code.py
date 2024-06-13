@@ -1,5 +1,3 @@
-import time
-
 import gym
 from gym import spaces
 from stable_baselines3 import DQN
@@ -36,6 +34,9 @@ class RoboboEnv(gym.Env):
         high = np.array([self.collision_threshold] * 8, dtype=np.float32)
         self.observation_space = spaces.Box(low=low, high=high, dtype=np.float32)
 
+        self.track_reward = []
+        self.track_sensors = []
+
     def reset(self):
         # Reset the state of the environment to an initial state
         # Implement any reset logic if required
@@ -68,7 +69,6 @@ class RoboboEnv(gym.Env):
         # turn 45 degrees right
         elif action == 2:
             return -0.5, 0.5
-
         return 1, 1
 
     def translate_action_test(self, action):
@@ -88,7 +88,6 @@ class RoboboEnv(gym.Env):
         # turn 45 degrees right
         elif action == 4:
             return 0, -0.5
-
         return 0, 0
 
     def step(self, action):
@@ -117,7 +116,7 @@ class RoboboEnv(gym.Env):
                   - 20 * len(sensor_data[sensor_data == self.collision_threshold])
                   + forward_bonus)
 
-        print(f"SENSOR DATA: {sensor_data},\n REWARD: {reward}")
+        print(f"ACTION {action},\nSENSOR DATA: {sensor_data},\n REWARD: {reward}")
 
         # TODO define termination condition- implement a timer for the simulator maybe
         done = False
@@ -129,7 +128,8 @@ class RoboboEnv(gym.Env):
 
     def close(self):
         # removed this because it shouldnt be the env stopping the task
-        return "Pens"
+        if isinstance(self.robobo, SimulationRobobo):
+            self.robobo.stop_simulation()
 
 
 def run_task1(rob: IRobobo):
@@ -138,21 +138,40 @@ def run_task1(rob: IRobobo):
 
     try:
         env = RoboboEnv(rob)
+        env_name = "RoboboEnv_Test"
 
         n_actions = env.action_space.n
         action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
+
+        """
+        Config for when we need it later
+        config = {
+            "batch_size": 32,
+            "buffer_size": 10000,
+            "exploration_final_eps": 0.02,
+            "exploration_fraction": 0.1,
+            "gamma": 0.99,
+            "gradient_steps": 4,
+            "learning_rate": 1e-4,
+            "learning_starts": 10000,
+            "target_update_interval": 1000,
+            "train_freq": 4,
+        }
+        """
 
         # Create the RL model
         model = DQN("MlpPolicy", env, verbose=1)
 
         # Train the model
-        model.learn(total_timesteps=10)
+        model.learn(total_timesteps=1000)
 
         # Save the model
-        model.save(str(FIGRURES_DIR / "ddpg_robobo"+f"{time.time()}"))
+        # model.save(str(FIGRURES_DIR / "ddpg_robobo"+f"{time.time()}"))
 
         # Load the model
-        model = DQN.load("ddpg_robobo")
+        # model = DQN.load("ddpg_robobo")
+        env.close()
+        print("is done?")
 
     # except Exception as e:
     #    print(e)
