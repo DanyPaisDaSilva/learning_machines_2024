@@ -42,32 +42,26 @@ class RoboboEnv(gym.Env):
         sensor_data = self.robobo.read_irs()
         return np.array(sensor_data)
 
+    def translate_action(self, action):
+        if action == 0:
+            return 0, 0
+            # move forward
+        elif action == 1:
+            return 1, 1
+        # move backward
+        elif action == -1:
+            return -1, -1
+        # turn 45 degrees left
+        elif action == 2:
+            return 0.5, -0.5
+        # turn 45 degrees right
+        elif action == 3:
+            return -0.5, 0.5
+
     def step(self, action):
         # Execute one time step within the environment
 
-        left_motor = 0
-        right_motor = 0
-        # TODO maybe do this check in a method for better readability? (D: Yes please)
-        # stop
-        if action == 0:
-            left_motor = 0
-            right_motor = 0
-        # move forward
-        elif action == 1:
-            left_motor = 1
-            right_motor = 1
-        # move backward
-        elif action == -1:
-            left_motor = -1
-            right_motor = -1
-        # turn 45 degrees left
-        elif action == 2:
-            left_motor = 0.5
-            right_motor = -0.5
-        # turn 45 degrees right
-        elif action == 3:
-            left_motor = -0.5
-            right_motor = 0.5
+        left_motor, right_motor = self.translate_action(action)
 
         # execute the action
         self.robobo.move(100 * left_motor, 100 * right_motor, 200)
@@ -76,7 +70,6 @@ class RoboboEnv(gym.Env):
         # current implementation regards anything above 100 as identical to 100- something to think about
         # sensor_data = np.clip(self.robobo.read_irs(), 0, self.collision_threshold)
         sensor_data = np.array(self.robobo.read_irs(), np.float32)
-
 
         # TODO: different filters for each sensor (i.e. center sensor high value is different to LL sensor)
         sensor_data[sensor_data > self.collision_threshold] = self.collision_threshold
@@ -122,12 +115,12 @@ def run_task1(rob: IRobobo):
         model.learn(total_timesteps=10000)
 
         # Save the model
-        # model.save("ddpg_robobo"+f"{time.time()}")
+        model.save(str(FIGRURES_DIR / "ddpg_robobo"+f"{time.time()}"))
 
         # Load the model
-        # model = DDPG.load("ddpg_robobo")
+        model = DQN.load("ddpg_robobo")
 
-    #except Exception as e:
+    # except Exception as e:
     #    print(e)
 
     finally:
