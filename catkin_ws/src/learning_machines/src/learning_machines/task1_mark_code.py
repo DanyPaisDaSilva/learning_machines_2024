@@ -147,21 +147,21 @@ def run_task1(rob: IRobobo):
         n_actions = env.action_space.n
         action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
 
-        """
-        Config for when we need it later
-        config = {
+
+        config_default = {
             "batch_size": 32,
             "buffer_size": 10000,
-            "exploration_final_eps": 0.02,
-            "exploration_fraction": 0.1,
-            "gamma": 0.99,
+            "exploration_initial_eps": 1.0,
+            "exploration_final_eps": 0.05,
+            "exploration_fraction": 0.3,
+            "gamma": 0.95,
             "gradient_steps": 4,
-            "learning_rate": 1e-4,
-            "learning_starts": 10000,
+            "learning_rate": 0.001,
+            "learning_starts": 100,
             "target_update_interval": 1000,
             "train_freq": 4,
         }
-        """
+
 
         # Create the RL model
         model = DQN("MlpPolicy", env, verbose=1)
