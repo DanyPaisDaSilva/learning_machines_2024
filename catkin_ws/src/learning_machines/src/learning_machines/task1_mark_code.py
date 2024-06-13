@@ -1,8 +1,11 @@
 import time
-
+import numpy as np
+import pandas as pd
 import gym
 from gym import spaces
 from stable_baselines3 import DQN
+from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback
+from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.noise import NormalActionNoise
 import numpy as np
 from data_files import FIGRURES_DIR
@@ -15,6 +18,7 @@ from robobo_interface import (
     SimulationRobobo,
     HardwareRobobo,
 )
+from stable_baselines3.common.vec_env import VecFrameStack
 
 
 class RoboboEnv(gym.Env):
@@ -96,21 +100,52 @@ class RoboboEnv(gym.Env):
         pass
 
 
+class SubProcVecEnv:
+    pass
+
+
 def run_task1(rob: IRobobo):
     if isinstance(rob, SimulationRobobo):
         rob.play_simulation()
 
     try:
         env = RoboboEnv(rob)
+        env_name = "RoboboEnv_Test"
+
 
         n_actions = env.action_space.n
         action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
+
+        """
+        Config for when we need it later
+        config = {
+            "batch_size": 32,
+            "buffer_size": 10000,
+            "exploration_final_eps": 0.02,
+            "exploration_fraction": 0.1,
+            "gamma": 0.99,
+            "gradient_steps": 4,
+            "learning_rate": 1e-4,
+            "learning_starts": 10000,
+            "target_update_interval": 1000,
+            "train_freq": 4,
+        }
+        """
+
+        eval_callback = EvalCallback(
+            eval_env=env,
+            eval_freq=10,
+            n_eval_episodes=10,
+            best_model_save_path=f"./logs/{env_name}",
+            log_path=f"./logs/{env_name}",
+        )
+        save_callback = CheckpointCallback(save_freq=6000, save_path=f"./logs/{env_name}")
 
         # Create the RL model
         model = DQN("MlpPolicy", env, verbose=1)
 
         # Train the model
-        model.learn(total_timesteps=10000)
+        model.learn(total_timesteps=12000, callback=[eval_callback, save_callback])
 
         # Save the model
         model.save(str(FIGRURES_DIR / "ddpg_robobo"+f"{time.time()}"))
@@ -118,9 +153,21 @@ def run_task1(rob: IRobobo):
         # Load the model
         model = DQN.load("ddpg_robobo")
 
+        plot_results(env_name)
+
     # except Exception as e:
     #    print(e)
 
     finally:
         if isinstance(rob, SimulationRobobo):
             rob.stop_simulation()
+
+def plot_results(env_name):
+    data = np.load(f"./logs/{env_name}/evaluations.npz")
+    pd.DataFrame({
+        "mean_reward": data["results"].mean(axis=1),
+        "timestep": data["timesteps"]
+    }).plot(
+        x="timestep",
+        y="mean_reward",
+    )
