@@ -27,7 +27,7 @@ class RoboboEnv(gym.Env):
 
         # Define action and observation space
         # Actions: 0 (forward), 1 (backward), 2 (turn 45 left), 3 (turn 45 right)
-        self.action_space = spaces.Discrete(4)
+        self.action_space = spaces.Discrete(5)
 
         # Observation: First 2 are the motor speeds, the other 8 are IR sensor readings
         # CHECK THE ORDER OF THE SENSORS!
@@ -56,13 +56,49 @@ class RoboboEnv(gym.Env):
         elif action == 3:
             return -0.5, 0.5
 
+        return 0, 0
+
+    def translate_action_bad(self, action):
+        # move forward
+        if action == 0:
+            return 1, 1
+        # turn 45 degrees left
+        elif action == 1:
+            return 0.5, -0.5
+        # turn 45 degrees right
+        elif action == 2:
+            return -0.5, 0.5
+
+        return 1, 1
+
+    def translate_action_test(self, action):
+        # move forward
+        if action == 0:
+            return -1, -1
+        elif action == 0:
+            return 1, 1
+        # turn 45 degrees left
+        elif action == 1:
+            return 0.5, 0
+        # turn 45 degrees right
+        elif action == 2:
+            return 0, 0.5
+        elif action == 3:
+            return -0.5, 0
+        # turn 45 degrees right
+        elif action == 4:
+            return 0, -0.5
+
+        return 0, 0
+
     def step(self, action):
         # Execute one time step within the environment
 
-        left_motor, right_motor = self.translate_action(action)
+        left_motor, right_motor = self.translate_action_test(action)
 
         # execute the action
-        self.robobo.move(100 * left_motor, 100 * right_motor, 200)
+        blockid = self.robobo.move(100 * left_motor, 100 * right_motor, 200)
+        self.robobo.is_blocked(blockid)
 
         # TODO save this to the observation space, clip IR values to 0, 100
         # current implementation regards anything above 100 as identical to 100- something to think about
@@ -73,15 +109,15 @@ class RoboboEnv(gym.Env):
         sensor_data[sensor_data > self.collision_threshold] = self.collision_threshold
         sensor_data[sensor_data < 10] = 0
 
-        print(sensor_data)
-
         # Reward logic based on sensor data
         # reward low sensor data and fast movement
         # need to find a better way for both motor and sensor data computation
         forward_bonus = 2 if action == 1 else 0
         reward = ((abs(left_motor + right_motor) * (1 - (np.max(sensor_data) / self.collision_threshold)))
-                  - 20 * sum(sensor_data[sensor_data == self.collision_threshold])
+                  - 20 * len(sensor_data[sensor_data == self.collision_threshold])
                   + forward_bonus)
+
+        print(f"SENSOR DATA: {sensor_data},\n REWARD: {reward}")
 
         # TODO define termination condition- implement a timer for the simulator maybe
         done = False
@@ -93,7 +129,7 @@ class RoboboEnv(gym.Env):
 
     def close(self):
         # removed this because it shouldnt be the env stopping the task
-        pass
+        return "Pens"
 
 
 def run_task1(rob: IRobobo):
@@ -110,7 +146,7 @@ def run_task1(rob: IRobobo):
         model = DQN("MlpPolicy", env, verbose=1)
 
         # Train the model
-        model.learn(total_timesteps=10000)
+        model.learn(total_timesteps=10)
 
         # Save the model
         model.save(str(FIGRURES_DIR / "ddpg_robobo"+f"{time.time()}"))
