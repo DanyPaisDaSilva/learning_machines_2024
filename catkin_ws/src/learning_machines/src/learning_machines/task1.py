@@ -14,23 +14,16 @@ from robobo_interface import (
     SimulationRobobo,
     HardwareRobobo,
 )
-from time import sleep
+from time import sleep, time
 
 
 class RoboboEnv(gym.Env):
-    def __init__(self, robobo: IRobobo, collision_threshold=1000):
+    def __init__(self, robobo: IRobobo):
         super(RoboboEnv, self).__init__()
         self.robobo = robobo
 
-        # parameters
-        self.collision_threshold = collision_threshold
-
         # Define action and observation space
-        # Actions: 0 (forward), 1 (backward), 2 (turn 45 left), 3 (turn 45 right)
         self.action_space = spaces.Discrete(4)
-
-        # Observation: First 2 are the motor speeds, the other 8 are IR sensor readings
-        # CHECK THE ORDER OF THE SENSORS!
         # Define the low and high arrays: motor speed range is [-1, 1]; IR is [0, 100]
         low = np.array([0] * 8, dtype=np.float32)
         high = np.array([self.collision_threshold] * 8, dtype=np.float32)
@@ -197,7 +190,6 @@ class RoboboEnv(gym.Env):
         # execute the action
         blockid = self.robobo.move(int(100 * left_motor), int(100 * right_motor), 200)
         if blockid in self.robobo._used_pids: self.robobo._used_pids.remove(blockid)
-        sleep(0.2)
 
         # TODO save this to the observation space, clip IR values to 0, 100
         # current implementation regards anything above 100 as identical to 100- something to think about
@@ -212,14 +204,13 @@ class RoboboEnv(gym.Env):
 
         # Reward logic based on sensor data
         # reward low sensor data and fast movement
-        # need to find a better way for both motor and sensor data computation
+        # reward moving forward
 
         forward_bonus = 5 if action == 1 else 1
 
         reward = ((abs(left_motor + right_motor) * forward_bonus * (
-                1 - (np.max(sensor_data) / self.collision_threshold)))
-                  - 10 * collision_counts
-                  )
+                1 - (np.avg(sensor_data) / np.max(sensor_data))))
+                  - 10 * collision_counts)
 
         print(f"ACTION {action},\nSENSOR DATA: {sensor_data},\n REWARD: {reward}")
 
@@ -267,7 +258,7 @@ def run_task1(rob: IRobobo):
     model = DQN("MlpPolicy", env, verbose=1, **config_default)
 
     # Train the model
-    model.learn(total_timesteps=200)
+    model.learn(total_timesteps=1000)
 
     # Save the model
     model.save(str(FIGRURES_DIR / "ddpg_robobo"+f"{time.time()}"))
