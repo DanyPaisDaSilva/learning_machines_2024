@@ -215,9 +215,9 @@ class RoboboEnv(gym.Env):
 
         forward_bonus = 3 if action == 1 else 1
 
-        reward = ((abs(left_motor + right_motor) * forward_bonus * (
-                1 - (np.average(sensor_data) / np.max(sensor_data))))
-                  - 10 * collision_counts)
+        reward = (abs(left_motor + right_motor) * forward_bonus * (
+                1 - (np.average(sensor_data) / np.max([0.001,np.max(sensor_data)])))
+                  - 5 * collision_counts)
 
         print(f"ACTION {action},\nSENSOR DATA: {sensor_data},\n REWARD: {reward}")
 
@@ -265,13 +265,13 @@ def run_task1(rob: IRobobo):
     model = DQN("MlpPolicy", env, verbose=1, **config_default)
 
     # Train the model
-    model.learn(total_timesteps=1000)
+    model.learn(total_timesteps=200)
 
     # Save the model
-    model.save(str(FIGRURES_DIR / "ddpg_robobo" + f"{time.time()}"))
+    #model.save(str(FIGRURES_DIR / f"ddpg_robobo_{time()}"))
 
     # Load the model
-    model = DQN.load("ddpg_robobo")
+    #model = DQN.load("ddpg_robobo")
     env.close()
 
     # plot the plots
