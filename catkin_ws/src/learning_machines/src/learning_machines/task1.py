@@ -26,7 +26,14 @@ class RoboboEnv(gym.Env):
         self.action_space = spaces.Discrete(4)
         # Define the low and high arrays: motor speed range is [-1, 1]; IR is [0, 100]
         low = np.array([0] * 8, dtype=np.float32)
-        high = np.array([self.collision_threshold] * 8, dtype=np.float32)
+
+        max_sensor_values = [99999, 99999, 99999, 99999, 99999, 99999, 99999, 99999]
+        if isinstance(self.robobo, SimulationRobobo):
+            self.filter_simulation(max_sensor_values)
+        else:
+            self.filter_hardware(max_sensor_values)
+
+        high = np.array(max_sensor_values, dtype=np.float32)
         self.observation_space = spaces.Box(low=low, high=high, dtype=np.float32)
 
         self.track_reward = []
@@ -116,7 +123,7 @@ class RoboboEnv(gym.Env):
         if sensor_data[7] < 15:
             sensor_data[6] = 0
 
-        return  max_counts
+        return max_counts
 
     def filter_simulation(self, sensor_data):
         max_counts = 0
@@ -180,7 +187,7 @@ class RoboboEnv(gym.Env):
         if sensor_data[7] < 15:
             sensor_data[6] = 0
 
-        return  max_counts
+        return max_counts
 
     def step(self, action):
 
@@ -206,10 +213,10 @@ class RoboboEnv(gym.Env):
         # reward low sensor data and fast movement
         # reward moving forward
 
-        forward_bonus = 5 if action == 1 else 1
+        forward_bonus = 3 if action == 1 else 1
 
         reward = ((abs(left_motor + right_motor) * forward_bonus * (
-                1 - (np.avg(sensor_data) / np.max(sensor_data))))
+                1 - (np.average(sensor_data) / np.max(sensor_data))))
                   - 10 * collision_counts)
 
         print(f"ACTION {action},\nSENSOR DATA: {sensor_data},\n REWARD: {reward}")
@@ -261,7 +268,7 @@ def run_task1(rob: IRobobo):
     model.learn(total_timesteps=1000)
 
     # Save the model
-    model.save(str(FIGRURES_DIR / "ddpg_robobo"+f"{time.time()}"))
+    model.save(str(FIGRURES_DIR / "ddpg_robobo" + f"{time.time()}"))
 
     # Load the model
     model = DQN.load("ddpg_robobo")
