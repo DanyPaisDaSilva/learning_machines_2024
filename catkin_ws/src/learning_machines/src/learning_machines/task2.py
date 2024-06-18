@@ -34,6 +34,7 @@ TASK FLOWCHART
 - Collide with it! (move forward until it disappears)
 - If you do not see green, reward the robot for turning (UNTIL green is seen, then punish staying in place)
 """
+
 import gym
 from gym import spaces
 from stable_baselines3 import DQN
@@ -52,17 +53,19 @@ from robobo_interface import (
     HardwareRobobo,
 )
 
+
 # CV2 operations
 
 def apply_mask(img):
     # TODO: test if this is good for both sim and irl
+    print(cv2.inRange(img, (45, 70, 70), (85, 255, 255)).shape)
     return cv2.inRange(img, (45, 70, 70), (85, 255, 255))
 
 
-def set_resolution(img):
+def set_resolution(img, resolution=32):
     # TODO: check irl resolution of camera
     # sim photo format is (512, 512)
-    return cv2.resize(img, (128, 128))
+    return cv2.resize(img, (resolution, resolution))
 
 
 def add_noise(img, mean=0, sigma=25):
@@ -76,14 +79,12 @@ def add_noise(img, mean=0, sigma=25):
 # contour/edge detection
 
 def process_image(img):
-    return set_resolution(apply_mask(img))
+    return set_resolution(apply_morphology(apply_mask(img)))
+
 
 def process_image_w_noise(img):
-    return set_resolution(apply_mask(add_noise(img)))
+    return apply_morphology(set_resolution(apply_morphology(apply_mask(add_noise(img)))))
 
-def process_image_full(img):
-    # apply morphology imported from image processing test- order or morphology and resolution???
-    return set_resolution(apply_morphology(apply_mask(img)))
 
 def calculate_weighted_area_score(mask, coefficient):
     height, width = mask.shape
@@ -114,6 +115,7 @@ def calculate_weighted_area_score(mask, coefficient):
 
     return weighted_area_score
 
+
 def apply_morphology(image):
     # Step 2: Closing operation to fill small holes
     closing_kernel_size = 5  # Kernel size for closing
@@ -127,6 +129,7 @@ def apply_morphology(image):
     # Perform the 'opening' operation, which is equivalent to erosion followed by dilation.
     return opened_image
 
+
 class RoboboEnv(gym.Env):
     def __init__(self, robobo: IRobobo):
         super(RoboboEnv, self).__init__()
@@ -136,11 +139,13 @@ class RoboboEnv(gym.Env):
         self.action_space = spaces.Discrete(4)
 
         # load example image
-        setup_img = process_image(self.get_image())
+        setup_img = set_resolution(process_image(self.get_image()), 32)
 
         # down sample image to 32x32 so that we aren't absolutely destroyed by high dimensionality
-        low = np.zeros((32, 32))
-        high = np.ones((32, 32))
+        low = np.zeros(setup_img.shape)
+        high = np.ones(setup_img.shape)*255
+        print(setup_img)
+        print(setup_img.shape)
         self.observation_space = spaces.Box(low=low, high=high, dtype=int)
 
         self.center_multiplier = 5
@@ -152,6 +157,7 @@ class RoboboEnv(gym.Env):
         # encode to hsv
         img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         return img_hsv
+
     def reset(self):
         # Reset the state of the environment to an initial state
         if isinstance(self.robobo, SimulationRobobo):
@@ -159,8 +165,9 @@ class RoboboEnv(gym.Env):
             # TODO: check default position in arena_approach.ttt for
             #  position.x, position.y, position.z as well as for
             #  orientation.yaw, orientation.pitch, orientation.roll
-            self.robobo.set_position((0,0,0), (0,0,0))
+            # self.robobo.set_position((0, 0, 0), (0, 0, 0))
             # also randomize food pos
+        return set_resolution(process_image(self.get_image()), 32)
 
     # TODO I don't want backward as an option for this task.
     def translate_action(self, action):
@@ -187,7 +194,7 @@ class RoboboEnv(gym.Env):
         if blockid in self.robobo._used_pids: self.robobo._used_pids.remove(blockid)
 
         # gets the down sampled (128x128), masked version of the image.
-        image_masked = process_image_full(self.get_image())
+        image_masked = process_image(self.get_image())
 
         # calculates the weighted area of "food" on camera to determine reward.
         # low: 0, high: 22 for coefficient=5 (don't ask about the numbers)
@@ -202,15 +209,18 @@ class RoboboEnv(gym.Env):
 
         # reward function: change in area from previous state.
         # TODO add a BIG reward if the robot collides with a food object
-        reward = weighted_area_score - self.old_reward
-        self.old_reward = reward
+        reward = weighted_area_score /255
+        # - self.old_reward
+        # self.old_reward = reward
 
         print(f"ACTION {action} with REWARD: {reward}")
 
         # TODO define termination condition- implement a timer for the simulator maybe
         done = False
 
-        return image_masked, reward, done, {}
+        state_image = set_resolution(image_masked, 32)
+
+        return state_image, reward, done, {}
 
     def render(self, mode='human', close=False):
         pass
@@ -244,10 +254,10 @@ def run_task2(rob: IRobobo):
     }
 
     # Create the RL model
-    model = DQN("CnnPolicy", env, verbose=1, **config_default)
+    model = DQN("MlpPolicy", env, verbose=1, **config_default)
 
     # Train the model
-    model.learn(total_timesteps=200)
+    model.learn(total_timesteps=2000)
 
     # Save the model
     # model.save(str(FIGRURES_DIR / f"ddpg_robobo_{time()}"))
