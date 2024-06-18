@@ -226,6 +226,7 @@ def run_task2(rob: IRobobo):
         rob.play_simulation()
 
     env = RoboboEnv(rob)
+    check_env(env)
 
     n_actions = env.action_space.n
 
@@ -246,7 +247,6 @@ def run_task2(rob: IRobobo):
 
     # Create the RL model
     model = DQN("MlpPolicy", env, verbose=1, **config_default)
-    check_env(env)
     # Train the model
     model.learn(total_timesteps=200)
 
