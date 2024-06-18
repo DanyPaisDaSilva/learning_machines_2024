@@ -34,7 +34,7 @@ TASK FLOWCHART
 - Collide with it! (move forward until it disappears)
 - If you do not see green, reward the robot for turning (UNTIL green is seen, then punish staying in place)
 """
-import gym
+import gymnasium as gym
 from gym import spaces
 from stable_baselines3 import DQN
 from stable_baselines3.common.noise import NormalActionNoise
