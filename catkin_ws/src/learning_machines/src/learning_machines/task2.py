@@ -244,7 +244,7 @@ def run_task2(rob: IRobobo):
     }
 
     # Create the RL model
-    model = DQN("CnnPolicy", env, verbose=1, **config_default)
+    model = DQN("CnnPolicy", env, verbose=1, **config_default, normalize_images=False)
 
     # Train the model
     model.learn(total_timesteps=200)
