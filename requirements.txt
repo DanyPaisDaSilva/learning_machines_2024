@@ -6,6 +6,6 @@ opencv-python~=4.8
 pandas
 matplotlib
 pandas
-gymnasium
+gym
 stable_baselines3
 shimmy
