@@ -1,47 +1,10 @@
-"""
-NOTES FOR TASK 2
-# Randomize the object generation (through lua)
-# Randomize the starting point OR 1000 steps in one arena, then 1000 in another arena, etc etc
-
-# Reality vs Simulation
-Add noise to the simulated camera to help with reality adjustment
-Randomize the camera orientation slightly
-
-# Reward function:
-The center of the object should be as close as possible.
--> what if there are two objects? steer to the closest one (largest area)
-
-Multiplying the different objectives: robot pays equal attention to both
-Adding the different objectives: robot can do one or the other independently
-
-## What do we reward?
-- Finding new greens
-- The DIFFERENCE in green area, vs one frame and the next
-
-
-
-# Image processing:
-Use OpenCV
-Normalize image dimensions!
-Filter for green, use HSV
-Try to find the center of the object
-
-
-TASK FLOWCHART
-- Search for objects
-- Move to the closest object (the closest being the largest sized mask)
--- Left area vs right area: You want to move towards the largest one...
-- Collide with it! (move forward until it disappears)
-- If you do not see green, reward the robot for turning (UNTIL green is seen, then punish staying in place)
-"""
-
 import gym
 from gym import spaces
 from stable_baselines3 import DQN
 from stable_baselines3.common.noise import NormalActionNoise
 import numpy as np
 from matplotlib import pyplot as plt
-from data_files import FIGRURES_DIR
+from data_files import FIGRURES_DIR, MODELS_DIR
 import cv2
 from robobo_interface import (
     IRobobo,
@@ -52,13 +15,18 @@ from robobo_interface import (
     SimulationRobobo,
     HardwareRobobo,
 )
+from datetime import datetime
 
+
+
+# load a model file?
+load_model = False
+model_path = str(MODELS_DIR / "dqn_robobo_2024-06-18_14-07-29.zip")
 
 # CV2 operations
 
 def apply_mask(img):
     # TODO: test if this is good for both sim and irl
-    print(cv2.inRange(img, (45, 70, 70), (85, 255, 255)).shape)
     return cv2.inRange(img, (45, 70, 70), (85, 255, 255))
 
 
@@ -144,8 +112,7 @@ class RoboboEnv(gym.Env):
         # down sample image to 32x32 so that we aren't absolutely destroyed by high dimensionality
         low = np.zeros(setup_img.shape)
         high = np.ones(setup_img.shape)*255
-        print(setup_img)
-        print(setup_img.shape)
+
         self.observation_space = spaces.Box(low=low, high=high, dtype=int)
 
         self.center_multiplier = 5
@@ -218,9 +185,7 @@ class RoboboEnv(gym.Env):
         # TODO define termination condition- implement a timer for the simulator maybe
         done = False
 
-        state_image = set_resolution(image_masked, 32)
-
-        return state_image, reward, done, {}
+        return image_masked, reward, done, {}
 
     def render(self, mode='human', close=False):
         pass
@@ -235,8 +200,6 @@ def run_task2(rob: IRobobo):
         rob.play_simulation()
 
     env = RoboboEnv(rob)
-
-    n_actions = env.action_space.n
 
     # TODO: change this?
     config_default = {
@@ -253,17 +216,21 @@ def run_task2(rob: IRobobo):
         "train_freq": 4,
     }
 
-    # Create the RL model
-    model = DQN("MlpPolicy", env, verbose=1, **config_default)
+    if load_model:
+        # Load the model
+        model = DQN.load(model_path)
+        model.set_env(env)
+    else:
+        # Create the RL model
+        model = DQN("MlpPolicy", env, verbose=1, **config_default)
 
     # Train the model
-    model.learn(total_timesteps=2000)
+    model.learn(total_timesteps=10)
 
     # Save the model
-    # model.save(str(FIGRURES_DIR / f"ddpg_robobo_{time()}"))
-
-    # Load the model
-    # model = DQN.load("ddpg_robobo")
+    save_path = str(MODELS_DIR / f"dqn_robobo_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}")
+    model.save(save_path)
+    print(f'model saved under {save_path}.zip')
     env.close()
 
     if isinstance(rob, SimulationRobobo):

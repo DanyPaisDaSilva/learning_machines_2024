@@ -1,3 +1,3 @@
-from .contants import RESULT_DIR, FIGRURES_DIR
+from .contants import RESULT_DIR, FIGRURES_DIR, MODELS_DIR
 
-__all__ = ("RESULT_DIR", "FIGRURES_DIR")
+__all__ = ("RESULT_DIR", "FIGRURES_DIR", "MODELS_DIR")

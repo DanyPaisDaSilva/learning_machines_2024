@@ -12,4 +12,10 @@ FIGRURES_DIR.mkdir(exist_ok=True)
 if not FIGRURES_DIR.is_dir():
     raise ImportError("Could not resolve location for figures dir, or it is a file")
 
-__all__ = ("RESULT_DIR", "FIGRURES_DIR")
+MODELS_DIR = RESULT_DIR / "models"
+MODELS_DIR.mkdir(exist_ok=True)
+
+if not MODELS_DIR.is_dir():
+    raise ImportError("Could not resolve location for models dir, or it is a file")
+
+__all__ = ("RESULT_DIR", "FIGRURES_DIR", "MODELS_DIR")
