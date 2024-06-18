@@ -6,6 +6,8 @@ import numpy as np
 import sys
 from pygame.locals import *
 
+from catkin_ws.src.learning_machines.src.learning_machines.task2 import apply_morphology, calculate_weighted_area_score
+
 # Initialize Pygame
 pygame.init()
 
@@ -62,6 +64,7 @@ def apply_mask(img):
     # TODO: test if this is good for both sim and irl
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     return cv2.inRange(hsv, (45, 70, 70), (85, 255, 225))
+"""
 def apply_morphology(image):
     # Step 2: Closing operation to fill small holes
     closing_kernel_size = 5  # Kernel size for closing
@@ -74,6 +77,38 @@ def apply_morphology(image):
 
     # Perform the 'opening' operation, which is equivalent to erosion followed by dilation.
     return opened_image
+    
+    
+    def calculate_weighted_area_score(mask, coefficient):
+    height, width = mask.shape
+    center_width = width // 2
+
+    # Define region of interest
+    left_bound = int(center_width - 0.15 * width)
+    right_bound = int(center_width + 0.15 * width)
+
+    # Extract ROI
+    roi = mask[:, left_bound:right_bound]
+
+    # Count white pixels in ROI
+    white_pixels_on_center = cv2.countNonZero(roi)
+
+    # Calculate effective area in the ROI
+    effective_area_in_roi = white_pixels_on_center * coefficient
+
+    # Calculate the remaining white pixels in the mask
+    white_pixels_off_center = cv2.countNonZero(mask) - white_pixels_on_center
+
+    # Step 4: Calculate the combined effective area
+    combined_effective_area = white_pixels_off_center + effective_area_in_roi
+
+    # Calculate the percentage of the effective area
+    total_pixel_count = mask.size  # Equivalent to height * width
+    weighted_area_score = (combined_effective_area / total_pixel_count) * 100 * 10
+
+    return weighted_area_score
+
+"""
 def find_contours(mask):
     """
     Find contours in the binary mask.
@@ -113,34 +148,6 @@ def get_largest_blob_area(contours):
 
     largest_contour = max(contours, key=cv2.contourArea)
     return calculate_blob_area(largest_contour)
-def calculate_weighted_area_scored(mask, coefficient):
-    height, width = mask.shape
-    center_width = width // 2
-
-    # Define region of interest
-    left_bound = int(center_width - 0.15 * width)
-    right_bound = int(center_width + 0.15 * width)
-
-    # Extract ROI
-    roi = mask[:, left_bound:right_bound]
-
-    # Count white pixels in ROI
-    white_pixels_on_center = cv2.countNonZero(roi)
-
-    # Calculate effective area in the ROI
-    effective_area_in_roi = white_pixels_on_center * coefficient
-
-    # Calculate the remaining white pixels in the mask
-    white_pixels_off_center = cv2.countNonZero(mask) - white_pixels_on_center
-
-    # Step 4: Calculate the combined effective area
-    combined_effective_area = white_pixels_off_center + effective_area_in_roi
-
-    # Calculate the percentage of the effective area
-    total_pixel_count = mask.size  # Equivalent to height * width
-    weighted_area_score = (combined_effective_area / total_pixel_count) * 100 * 10
-
-    return weighted_area_score
 def draw_contours(image, contours):
     """
     Draw each contour in a different color on the image.
@@ -202,7 +209,7 @@ def main():
                     elif 350 <= y <= 400:
                         if image is not None:
                             image = apply_morphology(image)
-                            area = calculate_special_area_percentage(image, 5)
+                            area = calculate_weighted_area_score(image, 5)
                             print(f"Area: {area}")
                             display_dummy_vars(window, dummy_vars=[f"{area}"])
                     elif 450 <= y <= 500:

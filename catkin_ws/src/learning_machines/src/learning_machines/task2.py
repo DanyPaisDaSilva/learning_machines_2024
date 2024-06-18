@@ -52,10 +52,6 @@ from robobo_interface import (
     HardwareRobobo,
 )
 
-from catkin_ws.src.learning_machines.src.learning_machines.image_processing_test import apply_morphology, \
-    calculate_weighted_area_percentage
-
-
 # CV2 operations
 
 def apply_mask(img):
@@ -89,6 +85,47 @@ def process_image_full(img):
     # apply morphology imported from image processing test- order or morphology and resolution???
     return set_resolution(apply_morphology(apply_mask(img)))
 
+def calculate_weighted_area_score(mask, coefficient):
+    height, width = mask.shape
+    center_width = width // 2
+
+    # Define region of interest
+    left_bound = int(center_width - 0.15 * width)
+    right_bound = int(center_width + 0.15 * width)
+
+    # Extract ROI
+    roi = mask[:, left_bound:right_bound]
+
+    # Count white pixels in ROI
+    white_pixels_on_center = cv2.countNonZero(roi)
+
+    # Calculate effective area in the ROI
+    effective_area_in_roi = white_pixels_on_center * coefficient
+
+    # Calculate the remaining white pixels in the mask
+    white_pixels_off_center = cv2.countNonZero(mask) - white_pixels_on_center
+
+    # Step 4: Calculate the combined effective area
+    combined_effective_area = white_pixels_off_center + effective_area_in_roi
+
+    # Calculate the percentage of the effective area
+    total_pixel_count = mask.size  # Equivalent to height * width
+    weighted_area_score = (combined_effective_area / total_pixel_count) * 100 * 10
+
+    return weighted_area_score
+
+def apply_morphology(image):
+    # Step 2: Closing operation to fill small holes
+    closing_kernel_size = 5  # Kernel size for closing
+    closing_kernel = np.ones((closing_kernel_size, closing_kernel_size), np.uint8)
+    closed_image = cv2.morphologyEx(image, cv2.MORPH_CLOSE, closing_kernel)
+
+    opening_kernel_size = 3  # Small kernel size for opening
+    opening_kernel = np.ones((opening_kernel_size, opening_kernel_size), np.uint8)
+    opened_image = cv2.morphologyEx(closed_image, cv2.MORPH_OPEN, opening_kernel)
+
+    # Perform the 'opening' operation, which is equivalent to erosion followed by dilation.
+    return opened_image
 
 class RoboboEnv(gym.Env):
     def __init__(self, robobo: IRobobo):
@@ -154,7 +191,7 @@ class RoboboEnv(gym.Env):
 
         # calculates the weighted area of "food" on camera to determine reward.
         # low: 0, high: 22 for coefficient=5 (don't ask about the numbers)
-        weighted_area_score = calculate_weighted_area_percentage(image_masked, self.center_multiplier)
+        weighted_area_score = calculate_weighted_area_score(image_masked, self.center_multiplier)
 
         # reward logic based on camera data:
         #   1) how centered is green
@@ -173,9 +210,7 @@ class RoboboEnv(gym.Env):
         # TODO define termination condition- implement a timer for the simulator maybe
         done = False
 
-        state_img = cv2.resize(image_masked, (32,32))
-
-        return state_img, reward, done, {}
+        return image_masked, reward, done, {}
 
     def render(self, mode='human', close=False):
         pass
@@ -200,7 +235,7 @@ def run_task2(rob: IRobobo):
         "exploration_initial_eps": 1.0,
         "exploration_final_eps": 0.05,
         "exploration_fraction": 0.5,
-        "gamma": 0.5,
+        "gamma": 0.95,
         "gradient_steps": 4,
         "learning_rate": 0.001,
         "learning_starts": 150,
@@ -209,7 +244,7 @@ def run_task2(rob: IRobobo):
     }
 
     # Create the RL model
-    model = DQN("MlpPolicy", env, verbose=1, **config_default)
+    model = DQN("CnnPolicy", env, verbose=1, **config_default)
 
     # Train the model
     model.learn(total_timesteps=200)
