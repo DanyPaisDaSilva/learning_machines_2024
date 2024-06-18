@@ -159,7 +159,7 @@ class RoboboEnv(gym.Env):
             # TODO: check default position in arena_approach.ttt for
             #  position.x, position.y, position.z as well as for
             #  orientation.yaw, orientation.pitch, orientation.roll
-            #self.robobo.set_position((0,0,0), (0,0,0))
+            self.robobo.set_position(0,0,0)
             # also randomize food pos
 
     # TODO I don't want backward as an option for this task.
