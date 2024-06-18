@@ -18,6 +18,8 @@ Adding the different objectives: robot can do one or the other independently
 - Finding new greens
 - The DIFFERENCE in green area, vs one frame and the next
 
+
+
 # Image processing:
 Use OpenCV
 Normalize image dimensions!
@@ -28,6 +30,7 @@ Try to find the center of the object
 TASK FLOWCHART
 - Search for objects
 - Move to the closest object (the closest being the largest sized mask)
+-- Left area vs right area: You want to move towards the largest one...
 - Collide with it! (move forward until it disappears)
 - If you do not see green, reward the robot for turning (UNTIL green is seen, then punish staying in place)
 """
@@ -48,6 +51,10 @@ from robobo_interface import (
     SimulationRobobo,
     HardwareRobobo,
 )
+
+from catkin_ws.src.learning_machines.src.learning_machines.image_processing_test import apply_morphology, \
+    calculate_weighted_area_percentage
+
 
 # CV2 operations
 
@@ -75,10 +82,12 @@ def add_noise(img, mean=0, sigma=25):
 def process_image(img):
     return set_resolution(apply_mask(img))
 
-
 def process_image_w_noise(img):
     return set_resolution(apply_mask(add_noise(img)))
 
+def process_image_full(img):
+    # apply morphology imported from image processing test- order or morphology and resolution???
+    return set_resolution(apply_morphology(apply_mask(img)))
 
 
 class RoboboEnv(gym.Env):
@@ -91,10 +100,14 @@ class RoboboEnv(gym.Env):
 
         # load example image
         setup_img = process_image(self.get_image())
-        low = np.zeros(setup_img.shape)
-        high = np.ones(setup_img.shape)
-        self.observation_space = spaces.Box(low=low, high=high, dtype=np.float32)
 
+        # down sample image to 32x32 so that we aren't absolutely destroyed by high dimensionality
+        low = np.zeros((32, 32))
+        high = np.ones((32, 32))
+        self.observation_space = spaces.Box(low=low, high=high, dtype=int)
+
+        self.center_multiplier = 5
+        self.old_reward = 0
         # TODO: change phone position/tilt so that it looks forward
 
     def get_image(self):
@@ -112,6 +125,7 @@ class RoboboEnv(gym.Env):
             self.robobo.set_position((0,0,0), (0,0,0))
             # also randomize food pos
 
+    # TODO I don't want backward as an option for this task.
     def translate_action(self, action):
         # move backward
         if action == 0:
@@ -128,7 +142,6 @@ class RoboboEnv(gym.Env):
         return 0, 0
 
     def step(self, action):
-
         # Execute one time step within the environment
         left_motor, right_motor = self.translate_action(action)
 
@@ -136,7 +149,12 @@ class RoboboEnv(gym.Env):
         blockid = self.robobo.move(int(100 * left_motor), int(100 * right_motor), 200)
         if blockid in self.robobo._used_pids: self.robobo._used_pids.remove(blockid)
 
-        input_data = process_image(self.get_image())
+        # gets the down sampled (128x128), masked version of the image.
+        image_masked = process_image_full(self.get_image())
+
+        # calculates the weighted area of "food" on camera to determine reward.
+        # low: 0, high: 22 for coefficient=5 (don't ask about the numbers)
+        weighted_area_score = calculate_weighted_area_percentage(image_masked, self.center_multiplier)
 
         # reward logic based on camera data:
         #   1) how centered is green
@@ -145,15 +163,19 @@ class RoboboEnv(gym.Env):
         # reward moving forward if we see a lot of green
         # turning if no box
 
-        # TODO: reward function :)
-        reward = 1
+        # reward function: change in area from previous state.
+        # TODO add a BIG reward if the robot collides with a food object
+        reward = weighted_area_score - self.old_reward
+        self.old_reward = reward
 
         print(f"ACTION {action} with REWARD: {reward}")
 
         # TODO define termination condition- implement a timer for the simulator maybe
         done = False
 
-        return input_data, reward, done, {}
+        state_img = cv2.resize(image_masked, (32,32))
+
+        return state_img, reward, done, {}
 
     def render(self, mode='human', close=False):
         pass
