@@ -29,5 +29,5 @@ if __name__ == "__main__":
 
     # TASK 1
     print("Start")
-    run_task1(rob)
+    run_task2(rob)
     print("Finish")

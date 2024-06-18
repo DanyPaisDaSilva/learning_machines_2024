@@ -250,10 +250,10 @@ def run_task2(rob: IRobobo):
     model.learn(total_timesteps=200)
 
     # Save the model
-    #model.save(str(FIGRURES_DIR / f"ddpg_robobo_{time()}"))
+    # model.save(str(FIGRURES_DIR / f"ddpg_robobo_{time()}"))
 
     # Load the model
-    #model = DQN.load("ddpg_robobo")
+    # model = DQN.load("ddpg_robobo")
     env.close()
 
     if isinstance(rob, SimulationRobobo):
