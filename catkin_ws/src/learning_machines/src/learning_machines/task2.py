@@ -38,6 +38,7 @@ import gym
 from gym import spaces
 from stable_baselines3 import DQN
 from stable_baselines3.common.noise import NormalActionNoise
+from stable_baselines3.common.env_checker import check_env
 import numpy as np
 from matplotlib import pyplot as plt
 from data_files import FIGRURES_DIR
@@ -245,7 +246,7 @@ def run_task2(rob: IRobobo):
 
     # Create the RL model
     model = DQN("MlpPolicy", env, verbose=1, **config_default)
-
+    check_env(env)
     # Train the model
     model.learn(total_timesteps=200)
 
