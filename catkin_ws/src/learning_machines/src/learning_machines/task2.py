@@ -117,6 +117,7 @@ class RoboboEnv(gym.Env):
 
         self.center_multiplier = 5
         self.old_reward = 0
+        self.number_of_food_collected = 0
         # TODO: change phone position/tilt so that it looks forward
 
     def get_image(self):
@@ -181,7 +182,9 @@ class RoboboEnv(gym.Env):
         # self.old_reward = reward
 
         print(f"ACTION {action} with REWARD: {reward}")
-
+        if self.robobo.nr_food_collected() > self.number_of_food_collected:
+            self.number_of_food_collected = self.robobo.nr_food_collected()
+            print("Collected food: ", self.robobo.nr_food_collected())
         # TODO define termination condition- implement a timer for the simulator maybe
         done = False
 
