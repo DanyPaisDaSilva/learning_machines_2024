@@ -268,7 +268,7 @@ class RoboboEnv(gym.Env):
         if food_collected >= 7:
             done = True
             print("Collected all the food!")
-        # if robot stuck/ too much time (2400 = 8min)
+        # if robot stuck / too much time passed (2400 = 8min) --> restart
         if self.timesteps > 2400:
             done = True
 
