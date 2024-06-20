@@ -17,10 +17,11 @@ from datetime import datetime
 from time import time
 
 # load a model file?
-load_model = False
-model_path = str(MODELS_DIR / "dqn_robobo_2024-06-18_14-07-29.zip")
+load_model = True
+load_and_train = False # load_model has to be False
+model_path = str(MODELS_DIR / "dqn_robobo_2024-06-20_20-37-09.zip")
 print_output = True
-save_model = False
+save_model = True
 
 
 ##################
@@ -118,7 +119,7 @@ def split_img_scores(img):
     split_C_score = np.sum(img[:, split_length + 2:split_length * 2])
     split_R_score = np.sum(img[:, split_length * 2:side_length])
 
-    # max count, with offset
+    # max count, with offset (because we assume that objects are rarely at top/bot
     max_C = (side_length - 10) * (split_length - 1)
     max_S = (side_length - 10) * split_length
 
@@ -126,8 +127,7 @@ def split_img_scores(img):
     return split_L_score / max_S, split_C_score / max_C, split_R_score / max_S
 
 
-def calc_reward(img, action, food_collected=0):
-
+def calc_reward(img, action, food_collected=0, timesteps = 0):
     reward = 0
 
     split_L_score, split_C_score, split_R_score = split_img_scores(img)
@@ -152,14 +152,14 @@ def calc_reward(img, action, food_collected=0):
     else:
         # reward turning if nothing can be seen
         if action == 1 or action == 2:
-            reward = 0.5
+            reward = 0.1
 
     # punish going backwards only if camera detects something
     if action == 3 and not (split_L_score + split_C_score + split_R_score == 0):
         reward -= 1
 
     # 1.x multiplier where 0.1 for each food collected
-    reward *= (1 + 0.1*food_collected)
+    reward *= (1 + 0.1 * food_collected)
 
     return reward
 
@@ -199,6 +199,8 @@ class RoboboEnv(gym.Env):
         self.observation_space = spaces.Box(low=low, high=high, dtype=np.uint8)
 
         self.center_multiplier = 5
+        # timesteps taken, 900 = 3 mins (with moving = 0.2)
+        self.timesteps = 0
         # TODO: change irl phone position/tilt so that it looks forward
 
     def get_image(self):
@@ -214,7 +216,6 @@ class RoboboEnv(gym.Env):
                 self.robobo.stop_simulation()
             self.robobo.play_simulation()
 
-            print(f"tilt :{self.robobo.read_phone_tilt()}")
             self.robobo.set_phone_tilt(95, 50)
 
             self.robobo.reset_wheels()
@@ -228,6 +229,7 @@ class RoboboEnv(gym.Env):
 
     # Execute one time step within the environment
     def step(self, action):
+        self.timesteps += 1
 
         # translate action
         left_motor, right_motor = translate_action(action)
@@ -255,13 +257,17 @@ class RoboboEnv(gym.Env):
         # reward moving forward if we see a lot of green
         # turning if no box
 
+        food_collected = 0
+        if isinstance(self.robobo, SimulationRobobo):
+            food_collected = self.robobo.nr_food_collected()
+
         # reward function: change in area from previous state.
-        reward = weighted_area_score
+        reward = calc_reward(image_masked, action, food_collected)
 
         if print_output: print(f"ACTION {action} with REWARD: {reward}")
 
         done = False
-        if isinstance(self.robobo, SimulationRobobo) and self.robobo.nr_food_collected() >= 7:
+        if food_collected >= 7:
             done = True
             print("Collected all the food!")
 
@@ -293,33 +299,37 @@ def run_task2(rob: IRobobo):
         # Load the model
         model = DQN.load(model_path)
         model.set_env(env)
+
+        # test the trained model
+        obs = env.reset()
+        print("START RUNNING LOADED MODEL")
+        for _ in range(1000):
+            action, _states = model.predict(obs)
+            obs, rewards, dones, info = env.step(action)
+            # env.render() # not implemented
+
     else:
-        # Create the RL model
-        model = DQN("MlpPolicy", env, verbose=1, **config_default)
+        if load_and_train:
+            model = DQN.load(model_path)
+            model.set_env(env)
+        else:
+            # Create the RL model
+            model = DQN("MlpPolicy", env, verbose=1, **config_default)
 
-    # Train the model
-    start_time = time()
-    model.learn(total_timesteps=2000)
-    end_time = time()
-    print(f"{end_time - start_time:.2f}")
-
-    # Save the model
-    if save_model:
-        save_path = str(MODELS_DIR / f"dqn_robobo_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}")
-        model.save(save_path)
-        print(f'model saved under {save_path}.zip')
+        try:
+            # Train the model
+            start_time = time()
+            model.learn(total_timesteps=2000)
+            end_time = time()
+            print(f"runtime: {end_time - start_time:.2f}s")
+        except Exception as e:
+            print(e)
+        finally:
+            # Save the model
+            if save_model:
+                save_path = str(MODELS_DIR / f"dqn_robobo_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}")
+                model.save(save_path)
+                print(f'model saved under {save_path}.zip')
 
     # close env
     env.close()
-
-    """
-    # load the model
-    loaded_model = PPO.load("ppo_cartpole")
-
-    # test the trained model
-    obs = env.reset()
-    for _ in range(1000):
-        action, _states = loaded_model.predict(obs)
-        obs, rewards, dones, info = env.step(action)
-        env.render()
-    """
