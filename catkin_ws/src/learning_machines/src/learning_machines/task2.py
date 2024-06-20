@@ -22,6 +22,7 @@ model_path = str(MODELS_DIR / "dqn_robobo_2024-06-18_14-07-29.zip")
 print_output = True
 save_model = False
 
+
 ##################
 # CV2 operations #
 ##################
@@ -112,14 +113,55 @@ def split_img_scores(img):
     side_length = img.shape[0]
     split_length = side_length // 3
 
-    split_L_score = np.sum(img[:, 0:split_length+1])
-    split_C_score = np.sum(img[:, split_length+2:split_length * 2])
+    # count pixels in
+    split_L_score = np.sum(img[:, 0:split_length + 1])
+    split_C_score = np.sum(img[:, split_length + 2:split_length * 2])
     split_R_score = np.sum(img[:, split_length * 2:side_length])
 
-    max_C = (side_length - 10) * (split_length-1)
+    # max count, with offset
+    max_C = (side_length - 10) * (split_length - 1)
     max_S = (side_length - 10) * split_length
 
-    return split_L_score/max_S, split_C_score/max_C, split_R_score/max_S
+    # max value +- 1.18
+    return split_L_score / max_S, split_C_score / max_C, split_R_score / max_S
+
+
+def calc_reward(img, action, food_collected=0):
+
+    reward = 0
+
+    split_L_score, split_C_score, split_R_score = split_img_scores(img)
+
+    if split_L_score < split_C_score and split_R_score < split_C_score:
+        # good if a lot of green in center
+        reward = split_C_score + 2
+        # reward going forward when a lot of green in center
+        if action == 0:
+            reward += 1
+    elif split_R_score < split_L_score:
+        reward = split_L_score + 0.5
+        # reward turning in the right direction
+        if action == 1:
+            reward += 0.5
+    elif split_L_score < split_R_score:
+        reward = split_R_score + 0.5
+        # reward turning in the right direction
+        if action == 2:
+            reward += 0.5
+    # if they are equal (i.e. (0, 0, 0) )
+    else:
+        # reward turning if nothing can be seen
+        if action == 1 or action == 2:
+            reward = 0.5
+
+    # punish going backwards only if camera detects something
+    if action == 3 and not (split_L_score + split_C_score + split_R_score == 0):
+        reward -= 1
+
+    # 1.x multiplier where 0.1 for each food collected
+    reward *= (1 + 0.1*food_collected)
+
+    return reward
 
 
 # translates action to left and right movement
@@ -202,7 +244,7 @@ class RoboboEnv(gym.Env):
         weighted_area_score = calculate_weighted_area_score(image_masked, self.center_multiplier)
 
         # test camera
-        #if weighted_area_score > 0:
+        # if weighted_area_score > 0:
         #    cv2.imwrite(str(FIGURES_DIR / f"test_img_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.jpeg"),
         #                image_masked * 255)
 
@@ -222,7 +264,6 @@ class RoboboEnv(gym.Env):
         if isinstance(self.robobo, SimulationRobobo) and self.robobo.nr_food_collected() >= 7:
             done = True
             print("Collected all the food!")
-
 
         return image_masked, reward, done, {}
 
