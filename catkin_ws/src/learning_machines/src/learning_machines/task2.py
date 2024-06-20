@@ -16,13 +16,13 @@ from robobo_interface import (
 from datetime import datetime
 from time import time
 
-# load a model file?
-load_model = True
+# RUN CONFIG PARAMETERS
+mark_reward = True  # keep False, mine is better (probably)
+load_model = False
 load_and_train = False  # load_model has to be False
-model_path = str(MODELS_DIR / "dqn_robobo_2024-06-20_20-37-09.zip")
-print_output = True
+model_path = str(MODELS_DIR / "dqn_robobo_2024-06-20_20-58-26.zip")
+print_output = False  # mostly for reward and action output
 save_model = True
-mark_reward = False
 
 
 ##################
@@ -30,7 +30,6 @@ mark_reward = False
 ##################
 
 def apply_mask(img):
-    # TODO: test if this is good for both sim and irl
     return cv2.inRange(img, (45, 70, 70), (85, 255, 255))
 
 
@@ -308,6 +307,7 @@ def run_task2(rob: IRobobo):
             action, _states = model.predict(obs)
             obs, rewards, dones, info = env.step(action)
             # env.render() # not implemented
+        print("FINISHED RUNNING LOADED MODEL")
 
     else:
         if load_and_train:
