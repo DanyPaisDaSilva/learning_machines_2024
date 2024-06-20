@@ -21,14 +21,17 @@ load_model = False
 model_path = str(MODELS_DIR / "dqn_robobo_2024-06-18_14-07-29.zip")
 print_output = True
 
-# CV2 operations
+
+##################
+# CV2 operations #
+##################
 
 def apply_mask(img):
     # TODO: test if this is good for both sim and irl
     return cv2.inRange(img, (45, 70, 70), (85, 255, 255))
 
 
-def set_resolution(img, resolution=32):
+def set_resolution(img, resolution=64):
     # sim photo format is (512, 512)
     # irl photo format is (1536, 2048)
     return cv2.resize(img, (resolution, resolution))
@@ -67,8 +70,11 @@ def apply_morphology(image):
     return opened_image
 
 
-# static functions
+####################
+# static functions #
+####################
 
+# mark reward function
 def calculate_weighted_area_score(img, coefficient):
     height, width = img.shape
     center_width = width // 2
@@ -99,6 +105,23 @@ def calculate_weighted_area_score(img, coefficient):
     return weighted_area_score
 
 
+# Dany reward function
+
+def split_img_scores(img):
+    # assuming img is processed and sides are equal length
+    side_length = img.shape[0]
+    split_length = side_length // 3
+
+    split_L_score = np.sum(img[:, 0:split_length+1])
+    split_C_score = np.sum(img[:, split_length+2:split_length * 2])
+    split_R_score = np.sum(img[:, split_length * 2:side_length])
+
+    max_C = (side_length - 10) * (split_length-1)
+    max_S = (side_length - 10) * split_length
+
+    return split_L_score, split_C_score, split_R_score
+
+
 # translates action to left and right movement
 def translate_action(action):
     # move forward
@@ -125,7 +148,7 @@ class RoboboEnv(gym.Env):
         self.action_space = spaces.Discrete(4)
 
         # load example image
-        setup_img = set_resolution(process_image(self.get_image()), 32)
+        setup_img = set_resolution(process_image(self.get_image()))
 
         # set low/high values using that example image
         low = np.zeros(setup_img.shape)
@@ -149,6 +172,9 @@ class RoboboEnv(gym.Env):
                 self.robobo.stop_simulation()
             self.robobo.play_simulation()
 
+            print(f"tilt :{self.robobo.read_phone_tilt()}")
+            self.robobo.set_phone_tilt(95, 50)
+
             self.robobo.reset_wheels()
 
             # TODO: check default position in arena_approach.ttt for
@@ -156,7 +182,7 @@ class RoboboEnv(gym.Env):
             #  orientation.yaw, orientation.pitch, orientation.roll
             # self.robobo.set_position((0, 0, 0), (0, 0, 0))
             # also randomize food pos
-        return set_resolution(process_image(self.get_image()), 32)
+        return set_resolution(process_image(self.get_image()))
 
     # Execute one time step within the environment
     def step(self, action):
@@ -176,8 +202,8 @@ class RoboboEnv(gym.Env):
         weighted_area_score = calculate_weighted_area_score(image_masked, self.center_multiplier)
 
         if weighted_area_score > 0:
-            cv2.imwrite(str(FIGURES_DIR / f"test_img_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"), image_masked*255)
-
+            cv2.imwrite(str(FIGURES_DIR / f"test_img_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.jpeg"),
+                        image_masked * 255)
 
         # reward logic based on camera data:
         #   1) how centered is green
@@ -191,11 +217,11 @@ class RoboboEnv(gym.Env):
 
         if print_output: print(f"ACTION {action} with REWARD: {reward}")
 
-        if self.robobo.nr_food_collected() >= 7:
+        done = False
+        if isinstance(self.robobo, SimulationRobobo) and self.robobo.nr_food_collected() >= 7:
             done = True
             print("Collected all the food!")
-        else:
-            done = False
+
 
         return image_masked, reward, done, {}
 
@@ -231,9 +257,9 @@ def run_task2(rob: IRobobo):
 
     # Train the model
     start_time = time()
-    model.learn(total_timesteps=10)
+    model.learn(total_timesteps=2000)
     end_time = time()
-    print(f"{end_time-start_time:.2f}")
+    print(f"{end_time - start_time:.2f}")
 
     # Save the model
     save_path = str(MODELS_DIR / f"dqn_robobo_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}")
