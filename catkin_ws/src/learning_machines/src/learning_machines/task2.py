@@ -18,10 +18,11 @@ from time import time
 
 # load a model file?
 load_model = True
-load_and_train = False # load_model has to be False
+load_and_train = False  # load_model has to be False
 model_path = str(MODELS_DIR / "dqn_robobo_2024-06-20_20-37-09.zip")
 print_output = True
 save_model = True
+mark_reward = False
 
 
 ##################
@@ -127,7 +128,7 @@ def split_img_scores(img):
     return split_L_score / max_S, split_C_score / max_C, split_R_score / max_S
 
 
-def calc_reward(img, action, food_collected=0, timesteps = 0):
+def calc_reward(img, action, food_collected=0, timesteps=0):
     reward = 0
 
     split_L_score, split_C_score, split_R_score = split_img_scores(img)
@@ -212,12 +213,13 @@ class RoboboEnv(gym.Env):
     def reset(self):
         # Reset the state of the environment to an initial state
         if isinstance(self.robobo, SimulationRobobo):
+            # reset environment
             if not self.robobo.is_stopped():
                 self.robobo.stop_simulation()
             self.robobo.play_simulation()
 
+            # reset phone tilt & wheels
             self.robobo.set_phone_tilt(95, 50)
-
             self.robobo.reset_wheels()
 
             # TODO: check default position in arena_approach.ttt for
@@ -225,6 +227,7 @@ class RoboboEnv(gym.Env):
             #  orientation.yaw, orientation.pitch, orientation.roll
             # self.robobo.set_position((0, 0, 0), (0, 0, 0))
             # also randomize food pos
+        self.timesteps = 0
         return set_resolution(process_image(self.get_image()))
 
     # Execute one time step within the environment
@@ -241,35 +244,33 @@ class RoboboEnv(gym.Env):
         # preprocess image
         image_masked = process_image(self.get_image())
 
-        # calculates the weighted area of "food" on camera to determine reward.
-        # low: 0, high: 22 for coefficient=5 (don't ask about the numbers)
-        weighted_area_score = calculate_weighted_area_score(image_masked, self.center_multiplier)
-
         # test camera
         # if weighted_area_score > 0:
         #    cv2.imwrite(str(FIGURES_DIR / f"test_img_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.jpeg"),
         #                image_masked * 255)
 
-        # reward logic based on camera data:
-        #   1) how centered is green
-        #   2) how much green do we see
-        # reward speed
-        # reward moving forward if we see a lot of green
-        # turning if no box
-
         food_collected = 0
         if isinstance(self.robobo, SimulationRobobo):
             food_collected = self.robobo.nr_food_collected()
 
-        # reward function: change in area from previous state.
-        reward = calc_reward(image_masked, action, food_collected)
+        if mark_reward:
+            # calculates the weighted area of "food" on camera to determine reward.
+            # low: 0, high: 22 for coefficient=5 (don't ask about the numbers)
+            reward = calculate_weighted_area_score(image_masked, self.center_multiplier)
+        else:
+            reward = calc_reward(image_masked, action, food_collected)
 
-        if print_output: print(f"ACTION {action} with REWARD: {reward}")
+        if print_output:
+            print(f"ACTION {action} with REWARD: {reward}")
 
         done = False
+        # if all food collected
         if food_collected >= 7:
             done = True
             print("Collected all the food!")
+        # if robot stuck/ too much time (2400 = 8min)
+        if self.timesteps > 2400:
+            done = True
 
         return image_masked, reward, done, {}
 
