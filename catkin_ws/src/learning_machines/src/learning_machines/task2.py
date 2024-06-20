@@ -2,7 +2,7 @@ import gym
 from gym import spaces
 from stable_baselines3 import DQN
 import numpy as np
-from data_files import FIGRURES_DIR, MODELS_DIR
+from data_files import FIGURES_DIR, MODELS_DIR
 import cv2
 from robobo_interface import (
     IRobobo,
@@ -19,7 +19,7 @@ from time import time
 # load a model file?
 load_model = False
 model_path = str(MODELS_DIR / "dqn_robobo_2024-06-18_14-07-29.zip")
-
+print_output = True
 
 # CV2 operations
 
@@ -175,6 +175,9 @@ class RoboboEnv(gym.Env):
         # low: 0, high: 22 for coefficient=5 (don't ask about the numbers)
         weighted_area_score = calculate_weighted_area_score(image_masked, self.center_multiplier)
 
+        if weighted_area_score > 0:
+            str(FIGURES_DIR / f"dqn_robobo_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}")
+
         # reward logic based on camera data:
         #   1) how centered is green
         #   2) how much green do we see
@@ -183,10 +186,9 @@ class RoboboEnv(gym.Env):
         # turning if no box
 
         # reward function: change in area from previous state.
-        # TODO add a BIG reward if the robot collides with a food object
         reward = weighted_area_score
 
-        print(f"ACTION {action} with REWARD: {reward}")
+        if print_output: print(f"ACTION {action} with REWARD: {reward}")
 
         if self.robobo.nr_food_collected() >= 7:
             done = True
