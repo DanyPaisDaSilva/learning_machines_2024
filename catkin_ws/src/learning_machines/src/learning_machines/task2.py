@@ -20,7 +20,7 @@ from time import time
 load_model = False
 model_path = str(MODELS_DIR / "dqn_robobo_2024-06-18_14-07-29.zip")
 print_output = True
-
+save_model = False
 
 ##################
 # CV2 operations #
@@ -263,9 +263,10 @@ def run_task2(rob: IRobobo):
     print(f"{end_time - start_time:.2f}")
 
     # Save the model
-    save_path = str(MODELS_DIR / f"dqn_robobo_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}")
-    model.save(save_path)
-    print(f'model saved under {save_path}.zip')
+    if save_model:
+        save_path = str(MODELS_DIR / f"dqn_robobo_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}")
+        model.save(save_path)
+        print(f'model saved under {save_path}.zip')
 
     # close env
     env.close()
