@@ -134,7 +134,6 @@ class RoboboEnv(gym.Env):
         self.observation_space = spaces.Box(low=low, high=high, dtype=np.uint8)
 
         self.center_multiplier = 5
-        self.old_reward = 0
         # TODO: change irl phone position/tilt so that it looks forward
 
     def get_image(self):
@@ -186,8 +185,6 @@ class RoboboEnv(gym.Env):
         # reward function: change in area from previous state.
         # TODO add a BIG reward if the robot collides with a food object
         reward = weighted_area_score
-        # - self.old_reward
-        # self.old_reward = reward
 
         print(f"ACTION {action} with REWARD: {reward}")
 
@@ -233,7 +230,7 @@ def run_task2(rob: IRobobo):
     start_time = time()
     model.learn(total_timesteps=1000)
     end_time = time()
-    print(f"{end_time-start_time}")
+    print(f"{end_time-start_time:.2f}")
 
     # Save the model
     save_path = str(MODELS_DIR / f"dqn_robobo_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}")
@@ -244,10 +241,10 @@ def run_task2(rob: IRobobo):
     env.close()
 
     """
-    # Optionally, load the model
+    # load the model
     loaded_model = PPO.load("ppo_cartpole")
 
-    # Test the trained model
+    # test the trained model
     obs = env.reset()
     for _ in range(1000):
         action, _states = loaded_model.predict(obs)
