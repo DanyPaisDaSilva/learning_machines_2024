@@ -1,9 +1,7 @@
 import gym
 from gym import spaces
 from stable_baselines3 import DQN
-from stable_baselines3.common.noise import NormalActionNoise
 import numpy as np
-from matplotlib import pyplot as plt
 from data_files import FIGRURES_DIR, MODELS_DIR
 import cv2
 from robobo_interface import (
@@ -16,12 +14,12 @@ from robobo_interface import (
     HardwareRobobo,
 )
 from datetime import datetime
-
-
+from time import time
 
 # load a model file?
 load_model = False
 model_path = str(MODELS_DIR / "dqn_robobo_2024-06-18_14-07-29.zip")
+
 
 # CV2 operations
 
@@ -31,8 +29,8 @@ def apply_mask(img):
 
 
 def set_resolution(img, resolution=32):
-    # TODO: check irl resolution of camera
     # sim photo format is (512, 512)
+    # irl photo format is (1536, 2048)
     return cv2.resize(img, (resolution, resolution))
 
 
@@ -42,46 +40,17 @@ def add_noise(img, mean=0, sigma=25):
     return noisy_image
 
 
-# other ideas:
-# blurring/smoothing
-# contour/edge detection
-
 def process_image(img):
-    return set_resolution(apply_morphology(apply_mask(img)))
+    return binarify_image(set_resolution(apply_morphology(apply_mask(img))))
+
+
+def binarify_image(img):
+    _, binary_image = cv2.threshold(img, 1, 255, cv2.THRESH_BINARY)
+    return (binary_image / 255).astype(np.uint8)
 
 
 def process_image_w_noise(img):
-    return apply_morphology(set_resolution(apply_morphology(apply_mask(add_noise(img)))))
-
-
-def calculate_weighted_area_score(mask, coefficient):
-    height, width = mask.shape
-    center_width = width // 2
-
-    # Define region of interest
-    left_bound = int(center_width - 0.15 * width)
-    right_bound = int(center_width + 0.15 * width)
-
-    # Extract ROI
-    roi = mask[:, left_bound:right_bound]
-
-    # Count white pixels in ROI
-    white_pixels_on_center = cv2.countNonZero(roi)
-
-    # Calculate effective area in the ROI
-    effective_area_in_roi = white_pixels_on_center * coefficient
-
-    # Calculate the remaining white pixels in the mask
-    white_pixels_off_center = cv2.countNonZero(mask) - white_pixels_on_center
-
-    # Step 4: Calculate the combined effective area
-    combined_effective_area = white_pixels_off_center + effective_area_in_roi
-
-    # Calculate the percentage of the effective area
-    total_pixel_count = mask.size  # Equivalent to height * width
-    weighted_area_score = (combined_effective_area / total_pixel_count) * 100 * 10
-
-    return weighted_area_score
+    return binarify_image(apply_morphology(set_resolution(apply_morphology(apply_mask(add_noise(img))))))
 
 
 def apply_morphology(image):
@@ -98,6 +67,55 @@ def apply_morphology(image):
     return opened_image
 
 
+# static functions
+
+def calculate_weighted_area_score(img, coefficient):
+    height, width = img.shape
+    center_width = width // 2
+
+    # Define region of interest
+    left_bound = int(center_width - 0.15 * width)
+    right_bound = int(center_width + 0.15 * width)
+
+    # Extract ROI
+    roi = img[:, left_bound:right_bound]
+
+    # Count white pixels in ROI
+    white_pixels_on_center = cv2.countNonZero(roi)
+
+    # Calculate effective area in the ROI
+    effective_area_in_roi = white_pixels_on_center * coefficient
+
+    # Calculate the remaining white pixels in the img
+    white_pixels_off_center = cv2.countNonZero(img) - white_pixels_on_center
+
+    # Step 4: Calculate the combined effective area
+    combined_effective_area = white_pixels_off_center + effective_area_in_roi
+
+    # Calculate the percentage of the effective area
+    total_pixel_count = img.size  # Equivalent to height * width
+    weighted_area_score = (combined_effective_area / total_pixel_count)
+
+    return weighted_area_score
+
+
+# translates action to left and right movement
+def translate_action(action):
+    # move forward
+    if action == 0:
+        return 1, 1
+    # turn 45 degrees left
+    elif action == 1:
+        return 0.5, -0.5
+    # turn 45 degrees right
+    elif action == 2:
+        return -0.5, 0.5
+    # move backward
+    elif action == 3:
+        return -1, -1
+    return 0, 0
+
+
 class RoboboEnv(gym.Env):
     def __init__(self, robobo: IRobobo):
         super(RoboboEnv, self).__init__()
@@ -109,15 +127,15 @@ class RoboboEnv(gym.Env):
         # load example image
         setup_img = set_resolution(process_image(self.get_image()), 32)
 
-        # down sample image to 32x32 so that we aren't absolutely destroyed by high dimensionality
+        # set low/high values using that example image
         low = np.zeros(setup_img.shape)
-        high = np.ones(setup_img.shape)*255
+        high = np.ones(setup_img.shape)
 
-        self.observation_space = spaces.Box(low=low, high=high, dtype=int)
+        self.observation_space = spaces.Box(low=low, high=high, dtype=np.uint8)
 
         self.center_multiplier = 5
         self.old_reward = 0
-        # TODO: change phone position/tilt so that it looks forward
+        # TODO: change irl phone position/tilt so that it looks forward
 
     def get_image(self):
         img = self.robobo.get_image_front()
@@ -128,7 +146,12 @@ class RoboboEnv(gym.Env):
     def reset(self):
         # Reset the state of the environment to an initial state
         if isinstance(self.robobo, SimulationRobobo):
+            if not self.robobo.is_stopped():
+                self.robobo.stop_simulation()
+            self.robobo.play_simulation()
+
             self.robobo.reset_wheels()
+
             # TODO: check default position in arena_approach.ttt for
             #  position.x, position.y, position.z as well as for
             #  orientation.yaw, orientation.pitch, orientation.roll
@@ -136,31 +159,17 @@ class RoboboEnv(gym.Env):
             # also randomize food pos
         return set_resolution(process_image(self.get_image()), 32)
 
-    # TODO I don't want backward as an option for this task.
-    def translate_action(self, action):
-        # move backward
-        if action == 0:
-            return -1, -1
-        # move forward
-        elif action == 1:
-            return 1, 1
-        # turn 45 degrees left
-        elif action == 2:
-            return 0.5, -0.5
-        # turn 45 degrees right
-        elif action == 3:
-            return -0.5, 0.5
-        return 0, 0
-
+    # Execute one time step within the environment
     def step(self, action):
-        # Execute one time step within the environment
-        left_motor, right_motor = self.translate_action(action)
+
+        # translate action
+        left_motor, right_motor = translate_action(action)
 
         # execute the action
         blockid = self.robobo.move(int(100 * left_motor), int(100 * right_motor), 200)
         if blockid in self.robobo._used_pids: self.robobo._used_pids.remove(blockid)
 
-        # gets the down sampled (128x128), masked version of the image.
+        # preprocess image
         image_masked = process_image(self.get_image())
 
         # calculates the weighted area of "food" on camera to determine reward.
@@ -176,19 +185,19 @@ class RoboboEnv(gym.Env):
 
         # reward function: change in area from previous state.
         # TODO add a BIG reward if the robot collides with a food object
-        reward = weighted_area_score /255
+        reward = weighted_area_score
         # - self.old_reward
         # self.old_reward = reward
 
         print(f"ACTION {action} with REWARD: {reward}")
 
-        # TODO define termination condition- implement a timer for the simulator maybe
-        done = False
+        if self.robobo.nr_food_collected() >= 7:
+            done = True
+            print("Collected all the food!")
+        else:
+            done = False
 
         return image_masked, reward, done, {}
-
-    def render(self, mode='human', close=False):
-        pass
 
     def close(self):
         if isinstance(self.robobo, SimulationRobobo):
@@ -196,12 +205,8 @@ class RoboboEnv(gym.Env):
 
 
 def run_task2(rob: IRobobo):
-    if isinstance(rob, SimulationRobobo):
-        rob.play_simulation()
-
     env = RoboboEnv(rob)
 
-    # TODO: change this?
     config_default = {
         "batch_size": 8,
         "buffer_size": 10000,
@@ -225,13 +230,27 @@ def run_task2(rob: IRobobo):
         model = DQN("MlpPolicy", env, verbose=1, **config_default)
 
     # Train the model
-    model.learn(total_timesteps=10)
+    start_time = time()
+    model.learn(total_timesteps=1000)
+    end_time = time()
+    print(f"{end_time-start_time}")
 
     # Save the model
     save_path = str(MODELS_DIR / f"dqn_robobo_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}")
     model.save(save_path)
     print(f'model saved under {save_path}.zip')
+
+    # close env
     env.close()
 
-    if isinstance(rob, SimulationRobobo):
-        rob.stop_simulation()
+    """
+    # Optionally, load the model
+    loaded_model = PPO.load("ppo_cartpole")
+
+    # Test the trained model
+    obs = env.reset()
+    for _ in range(1000):
+        action, _states = loaded_model.predict(obs)
+        obs, rewards, dones, info = env.step(action)
+        env.render()
+    """
