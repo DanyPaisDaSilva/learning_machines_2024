@@ -119,7 +119,7 @@ def split_img_scores(img):
     max_C = (side_length - 10) * (split_length-1)
     max_S = (side_length - 10) * split_length
 
-    return split_L_score, split_C_score, split_R_score
+    return split_L_score/max_S, split_C_score/max_C, split_R_score/max_S
 
 
 # translates action to left and right movement
@@ -201,9 +201,10 @@ class RoboboEnv(gym.Env):
         # low: 0, high: 22 for coefficient=5 (don't ask about the numbers)
         weighted_area_score = calculate_weighted_area_score(image_masked, self.center_multiplier)
 
-        if weighted_area_score > 0:
-            cv2.imwrite(str(FIGURES_DIR / f"test_img_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.jpeg"),
-                        image_masked * 255)
+        # test camera
+        #if weighted_area_score > 0:
+        #    cv2.imwrite(str(FIGURES_DIR / f"test_img_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.jpeg"),
+        #                image_masked * 255)
 
         # reward logic based on camera data:
         #   1) how centered is green
