@@ -1,4 +1,4 @@
-from data_files import FIGRURES_DIR
+from data_files import FIGURES_DIR
 from robobo_interface import (
     IRobobo,
     Emotion,
@@ -69,7 +69,7 @@ def plot_data(sensor_data_list, direction_list):
     plt.show()
 
     # Show plot
-    plt.savefig(str(FIGRURES_DIR / "plot1.png"))
+    plt.savefig(str(FIGURES_DIR / "plot1.png"))
     plt.show()
 
 

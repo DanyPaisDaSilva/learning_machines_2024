@@ -4,7 +4,7 @@ from stable_baselines3 import DQN
 from stable_baselines3.common.noise import NormalActionNoise
 import numpy as np
 from matplotlib import pyplot as plt
-from data_files import FIGRURES_DIR
+from data_files import FIGURES_DIR
 from robobo_interface import (
     IRobobo,
     Emotion,
@@ -268,7 +268,7 @@ def run_task1(rob: IRobobo):
     model.learn(total_timesteps=200)
 
     # Save the model
-    #model.save(str(FIGRURES_DIR / f"ddpg_robobo_{time()}"))
+    #model.save(str(FIGURES_DIR / f"ddpg_robobo_{time()}"))
 
     # Load the model
     #model = DQN.load("ddpg_robobo")
@@ -306,7 +306,7 @@ def plot_sensor_data(sensor_data_list):
     plt.show()
 
     # Show plot
-    plt.savefig(str(FIGRURES_DIR / "sensor_data.png"))
+    plt.savefig(str(FIGURES_DIR / "sensor_data.png"))
     plt.show()
 
 
@@ -325,5 +325,5 @@ def plot_reward(reward_data_list):
     plt.show()
 
     # Show plot
-    plt.savefig(str(FIGRURES_DIR / "reward_data.png"))
+    plt.savefig(str(FIGURES_DIR / "reward_data.png"))
     plt.show()

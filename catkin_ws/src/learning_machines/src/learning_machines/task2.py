@@ -176,7 +176,8 @@ class RoboboEnv(gym.Env):
         weighted_area_score = calculate_weighted_area_score(image_masked, self.center_multiplier)
 
         if weighted_area_score > 0:
-            str(FIGURES_DIR / f"dqn_robobo_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}")
+            cv2.imwrite(str(FIGURES_DIR / f"test_img_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"), image_masked*255)
+
 
         # reward logic based on camera data:
         #   1) how centered is green
@@ -230,7 +231,7 @@ def run_task2(rob: IRobobo):
 
     # Train the model
     start_time = time()
-    model.learn(total_timesteps=1000)
+    model.learn(total_timesteps=10)
     end_time = time()
     print(f"{end_time-start_time:.2f}")
 
