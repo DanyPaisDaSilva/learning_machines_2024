@@ -17,10 +17,12 @@ from datetime import datetime
 from time import time
 
 # RUN CONFIG PARAMETERS
-mark_reward = True  # keep False, mine is better (probably)
+
 load_model = False
 load_and_train = False  # load_model has to be False
-model_path = str(MODELS_DIR / "dqn_robobo_2024-06-20_20-58-26.zip")
+model_path = str(MODELS_DIR / "dqn_robobo_2024-06-20_21-05-42.zip")
+
+mark_reward = False  # keep False, mine is better (probably)
 print_output = False  # mostly for reward and action output
 save_model = True
 
@@ -270,6 +272,7 @@ class RoboboEnv(gym.Env):
         # if robot stuck / too much time passed (2400 = 8min) --> restart
         if isinstance(self.robobo, SimulationRobobo) and self.timesteps > 2400:
             done = True
+            print("Running out of time :(")
 
         return image_masked, reward, done, {}
 
@@ -320,7 +323,7 @@ def run_task2(rob: IRobobo):
         try:
             # Train the model
             start_time = time()
-            model.learn(total_timesteps=2000)
+            model.learn(total_timesteps=100000)
             end_time = time()
             print(f"runtime: {end_time - start_time:.2f}s")
         except Exception as e:
