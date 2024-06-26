@@ -39,9 +39,17 @@ def apply_mask(img, state="RED"):
         # apply green mask
         return cv2.inRange(img, (45, 70, 70), (85, 255, 255))
 
-
 def apply_red_mask(img):
-    return cv2.inRange(img, np.array([115, 70, 70]), np.array([145, 255, 225]))
+    lower_red = np.array([0, 50, 50])
+    upper_red = np.array([10, 255, 255])
+
+    lower_red2 = np.array([160, 50, 50])
+    upper_red2 = np.array([180, 255, 255])
+
+    mask1 = cv2.inRange(img, lower_red, upper_red)
+    mask2 = cv2.inRange(img, lower_red2, upper_red2)
+
+    return mask1 + mask2
 
 
 def set_resolution(img, resolution=64):
@@ -56,49 +64,16 @@ def add_noise(img, mean=0, sigma=25):
     return noisy_image
 
 
-def pooling(mat, ksize, method='max', pad=False):
-    """Non-overlapping pooling on 2D or 3D data.
-    (ref: https://stackoverflow.com/questions/42463172/how-to-perform-max-mean-pooling-on-a-2d-array-using-numpy)
+def max_pooling(img):
+    kernel_size = (8, 8)  # This is equivalent to a 2x2 pooling window in max pooling
+    kernel = np.ones(kernel_size, np.uint8)
 
-    <mat>: ndarray, input array to pool.
-    <ksize>: tuple of 2, kernel size in (ky, kx).
-    <method>: str, 'max for max-pooling,
-                   'mean' for mean-pooling.
-    <pad>: bool, pad <mat> or not. If no pad, output has size
-           n//f, n being <mat> size, f being kernel size.
-           if pad, output has size ceil(n/f).
-
-    Return <result>: pooled matrix.
-    """
-
-    m, n = mat.shape[:2]
-    ky, kx = ksize
-
-    _ceil = lambda x, y: int(np.ceil(x / float(y)))
-
-    if pad:
-        ny = _ceil(m, ky)
-        nx = _ceil(n, kx)
-        size = (ny * ky, nx * kx) + mat.shape[2:]
-        mat_pad = np.full(size, np.nan)
-        mat_pad[:m, :n, ...] = mat
-    else:
-        ny = m // ky
-        nx = n // kx
-        mat_pad = mat[:ny * ky, :nx * kx, ...]
-
-    new_shape = (ny, ky, nx, kx) + mat.shape[2:]
-
-    if method == 'max':
-        result = np.nanmax(mat_pad.reshape(new_shape), axis=(1, 3))
-    else:
-        result = np.nanmean(mat_pad.reshape(new_shape), axis=(1, 3))
-
-    return result
+    # Perform dilation to simulate max pooling
+    return cv2.dilate(img, kernel, iterations=1)
 
 
 def process_image(img):
-    return binarify_image(set_resolution(apply_morphology(pooling(apply_mask(img), (4, 4)))))
+    return binarify_image(set_resolution(apply_morphology(max_pooling(apply_mask(img)))))
 
 
 def binarify_image(img):
@@ -274,13 +249,14 @@ class RoboboEnv(gym.Env):
 
         if reward > 0:
             size = 64
-            state = "GREEN"
-            # image1 = set_resolution(self.robobo.get_image_front(), size)
+            state = "RED"
+            image1 = self.robobo.get_image_front()
             image2 = set_resolution(binarify_image(apply_mask(self.get_image(), state)) * 255, size)
-            image3 = set_resolution(binarify_image(pooling(apply_mask(self.get_image(), state), (4, 4))) * 255, size)
+            image3 = set_resolution(max_pooling(binarify_image(apply_mask(self.get_image(), state))) * 255, size)
             # Concatenate the images horizontally
             combined_image = cv2.hconcat([image2, image3])
-
+            cv2.imwrite(str(FIGURES_DIR / f"test_img_2{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.jpeg"),
+                        image1)
             cv2.imwrite(str(FIGURES_DIR / f"test_img_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.jpeg"),
                         combined_image)
 
