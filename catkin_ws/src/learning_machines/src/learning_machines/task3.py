@@ -61,16 +61,14 @@ def binarify_image(img):
 
 
 def apply_morphology(image):
-    # Step 2: Closing operation to fill small holes
-    closing_kernel_size = 5  # Kernel size for closing
+    closing_kernel_size = 5
     closing_kernel = np.ones((closing_kernel_size, closing_kernel_size), np.uint8)
     closed_image = cv2.morphologyEx(image, cv2.MORPH_CLOSE, closing_kernel)
 
-    opening_kernel_size = 3  # Small kernel size for opening
+    opening_kernel_size = 3
     opening_kernel = np.ones((opening_kernel_size, opening_kernel_size), np.uint8)
     opened_image = cv2.morphologyEx(closed_image, cv2.MORPH_OPEN, opening_kernel)
 
-    # Perform the 'opening' operation, which is equivalent to erosion followed by dilation.
     return opened_image
 
 
