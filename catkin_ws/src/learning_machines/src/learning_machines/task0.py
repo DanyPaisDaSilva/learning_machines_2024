@@ -11,7 +11,7 @@ from robobo_interface import (
 from matplotlib import pyplot as plt
 
 
-def do_task0(rob: IRobobo, duration=20000):
+def run_task0(rob: IRobobo, duration=20000):
     '''
     does everything needed to demo task0
     :param rob: robobo object

@@ -23,7 +23,7 @@ load_model = False
 load_and_train = False  # load_model has to be False
 model_path = str(MODELS_DIR / "dqn_robobo_2024-06-21_10-56-04.zip")
 
-print_output = False  # mostly for reward and action output
+print_output = True  # mostly for reward and action output
 save_model = True
 
 
@@ -34,13 +34,13 @@ save_model = True
 def apply_mask(img, state="RED"):
     if state == "RED":
         # apply red mask
-        return cv2.inRange(img, (45, 70, 70), (85, 255, 255))
+        return cv2.inRange(img, (105, 70, 70), (145, 255, 225))
     else:
         # apply green mask
         return cv2.inRange(img, (45, 70, 70), (85, 255, 255))
 
 
-def set_resolution(img, resolution=32):
+def set_resolution(img, resolution=16):
     # sim photo format is (512, 512)
     # irl photo format is (1536, 2048)
     return cv2.resize(img, (resolution, resolution))
@@ -90,50 +90,46 @@ def split_img_scores(img):
     # assuming img is processed and sides are equal length
     side_length = img.shape[0]
     split_length = side_length // 3
+    remainder = img.shape[0] % 3
 
     # count pixels in
-    split_L_score = np.sum(img[:, 0:split_length + 1])
-    split_C_score = np.sum(img[:, split_length + 2:split_length * 2])
-    split_R_score = np.sum(img[:, split_length * 2:side_length])
+    split_L_score = np.sum(img[:, 0:split_length])
+    split_C_score = np.sum(img[:, split_length:split_length * 2 + remainder])
+    split_R_score = np.sum(img[:, split_length * 2 + remainder:side_length])
 
     # max count, with offset (because we assume that objects are rarely at top/bot
-    max_C = (side_length - 10) * (split_length - 1)
-    max_S = (side_length - 10) * split_length
+    max_value = side_length * side_length
 
-    # max value +- 1.18
-    return split_L_score / max_S, split_C_score / max_C, split_R_score / max_S
+    # a bit more lenient on center, because it's more important
+    return split_L_score / max_value, split_C_score / (max_value - 5), split_R_score / max_value
 
 
-def calc_reward(img, action, timesteps=0):
+def calc_reward(img, action):
     reward = 0
 
     split_L_score, split_C_score, split_R_score = split_img_scores(img)
 
     if split_L_score < split_C_score and split_R_score < split_C_score:
         # good if a lot of green in center
-        reward = split_C_score + 2
+        reward = split_C_score + 3
         # reward going forward when a lot of green in center
         if action == 0:
-            reward += 1
+            reward += 2
     elif split_R_score < split_L_score:
         reward = split_L_score + 0.5
         # reward turning in the right direction
         if action == 1:
-            reward += 0.5
+            reward += 1
     elif split_L_score < split_R_score:
         reward = split_R_score + 0.5
         # reward turning in the right direction
         if action == 2:
-            reward += 0.5
+            reward += 1
     # if they are equal (i.e. (0, 0, 0) )
     else:
         # reward turning if nothing can be seen
         if action == 1 or action == 2:
-            reward = 0.1
-
-    # punish going backwards only if camera detects something
-    if action == 3 and not (split_L_score + split_C_score + split_R_score == 0):
-        reward -= 1
+            reward = 0.5
 
     return reward
 
@@ -160,10 +156,10 @@ def translate_action(action):
         return 1, 1
     # turn 45 degrees left
     elif action == 1:
-        return 0.5, -0.5
+        return 0.5, 0
     # turn 45 degrees right
     elif action == 2:
-        return -0.5, 0.5
+        return 0, 0.5
     # if nothing works return stay still
     return 0, 0
 
@@ -227,8 +223,13 @@ class RoboboEnv(gym.Env):
 
         # preprocess image
         image_masked = process_image(self.get_image())
+        # test camera
 
         reward = get_reward(image_masked, action, self.state)
+
+        if reward > 0:
+            cv2.imwrite(str(FIGURES_DIR / f"test_img_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.jpeg"),
+                        image_masked * 255)
 
         self.track_reward.append(reward)
 
@@ -241,7 +242,7 @@ class RoboboEnv(gym.Env):
             done = True
             print("Food collected!")
         # if robot stuck / too much time passed (480s = 8 min) --> restart
-        if isinstance(self.robobo, SimulationRobobo) and self.robobo.get_sim_time() > 480:
+        if isinstance(self.robobo, SimulationRobobo) and self.robobo.get_sim_time() > 60: #480
             done = True
             print("Ran out of time :(")
 
@@ -252,7 +253,7 @@ class RoboboEnv(gym.Env):
             self.robobo.stop_simulation()
 
 
-def run_task2(rob: IRobobo):
+def run_task3(rob: IRobobo):
     env = RoboboEnv(rob)
 
     config_default = {
@@ -294,7 +295,7 @@ def run_task2(rob: IRobobo):
             # Train the model
             print("TRAINING MODEL")
             start_time = time()
-            model.learn(total_timesteps=100000)
+            model.learn(total_timesteps=2000)
             end_time = time()
             print(f"TRAINING MODEL FINISHED WITH RUNTIME: {end_time - start_time:.2f}s")
         except Exception as e:
