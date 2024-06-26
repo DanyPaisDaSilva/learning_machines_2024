@@ -44,37 +44,20 @@ def apply_red_mask(img):
     return mask1 + mask2
 
 
-def set_resolution(img, resolution=64):
+def set_resolution(img, resolution=16):
     # sim photo format is (512, 512)
     # irl photo format is (1536, 2048)
     return cv2.resize(img, (resolution, resolution))
 
 
-def add_noise(img, mean=0, sigma=25):
-    gaussian_noise = np.random.normal(mean, sigma, img.shape).astype('uint8')
-    noisy_image = cv2.add(img, gaussian_noise)
-    return noisy_image
-
-
-def max_pooling(img):
-    kernel_size = (8, 8)  # This is equivalent to a 2x2 pooling window in max pooling
+def max_pooling(img, kernel_size=(16, 16)):
     kernel = np.ones(kernel_size, np.uint8)
-
-    # Perform dilation to simulate max pooling
     return cv2.dilate(img, kernel, iterations=1)
-
-
-def process_image(img):
-    return binarify_image(set_resolution(apply_morphology(max_pooling(apply_mask(img)))))
 
 
 def binarify_image(img):
     _, binary_image = cv2.threshold(img, 1, 255, cv2.THRESH_BINARY)
     return (binary_image / 255).astype(np.uint8)
-
-
-def process_image_w_noise(img):
-    return binarify_image(apply_morphology(set_resolution(apply_morphology(apply_mask(add_noise(img))))))
 
 
 def apply_morphology(image):
@@ -89,6 +72,12 @@ def apply_morphology(image):
 
     # Perform the 'opening' operation, which is equivalent to erosion followed by dilation.
     return opened_image
+
+
+def process_image(img):
+    return binarify_image(set_resolution(max_pooling(apply_mask(img))))
+    #return binarify_image(set_resolution(max_pooling((apply_morphology(apply_mask(img))))))
+
 
 # RUN CONFIG PARAMETERS
 
@@ -125,7 +114,7 @@ def split_img_scores(img):
     return split_L_score / max_value, split_C_score / (max_value - 5), split_R_score / max_value
 
 
-def calc_reward(img, action):
+def get_reward(img, action, food_base_distance=0):
     reward = 0
 
     split_L_score, split_C_score, split_R_score = split_img_scores(img)
@@ -152,22 +141,9 @@ def calc_reward(img, action):
         if action == 1 or action == 2:
             reward = 0.5
 
+    reward += food_base_distance
+
     return reward
-
-
-def get_reward(img, action=0, state="RED"):
-    if state == "RED":
-        return red_reward(img, action)
-    else:
-        return green_reward(img)
-
-
-def red_reward(img, action):
-    return calc_reward(img, action)
-
-
-def green_reward(img):
-    pass
 
 
 # translates action to left and right movement
@@ -244,9 +220,13 @@ class RoboboEnv(gym.Env):
 
         # preprocess image
         image_masked = process_image(self.get_image())
-        # test camera
 
-        reward = get_reward(image_masked, action, self.state)
+        reward = get_reward(image_masked, action)
+
+        # cam test
+        if reward > 0:
+            cv2.imwrite(str(FIGURES_DIR / f"test_img_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.jpeg"),
+                        image_masked * 255)
 
         self.track_reward.append(reward)
 
@@ -259,7 +239,7 @@ class RoboboEnv(gym.Env):
             done = True
             print("Food collected!")
         # if robot stuck / too much time passed (480s = 8 min) --> restart
-        if isinstance(self.robobo, SimulationRobobo) and self.robobo.get_sim_time() > 60:  # 480
+        if isinstance(self.robobo, SimulationRobobo) and self.robobo.get_sim_time() > 480:
             done = True
             print("Ran out of time :(")
 
