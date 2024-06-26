@@ -23,7 +23,6 @@ load_model = False
 load_and_train = False  # load_model has to be False
 model_path = str(MODELS_DIR / "dqn_robobo_2024-06-21_10-56-04.zip")
 
-mark_reward = False  # keep False, mine is better (probably)
 print_output = False  # mostly for reward and action output
 save_model = True
 
@@ -32,11 +31,16 @@ save_model = True
 # CV2 operations #
 ##################
 
-def apply_mask(img):
-    return cv2.inRange(img, (45, 70, 70), (85, 255, 255))
+def apply_mask(img, state="RED"):
+    if state == "RED":
+        # apply red mask
+        return cv2.inRange(img, (45, 70, 70), (85, 255, 255))
+    else:
+        # apply green mask
+        return cv2.inRange(img, (45, 70, 70), (85, 255, 255))
 
 
-def set_resolution(img, resolution=64):
+def set_resolution(img, resolution=32):
     # sim photo format is (512, 512)
     # irl photo format is (1536, 2048)
     return cv2.resize(img, (resolution, resolution))
@@ -79,36 +83,6 @@ def apply_morphology(image):
 # static functions #
 ####################
 
-# mark reward function
-def calculate_weighted_area_score(img, coefficient):
-    height, width = img.shape
-    center_width = width // 2
-
-    # Define region of interest
-    left_bound = int(center_width - 0.15 * width)
-    right_bound = int(center_width + 0.15 * width)
-
-    # Extract ROI
-    roi = img[:, left_bound:right_bound]
-
-    # Count white pixels in ROI
-    white_pixels_on_center = cv2.countNonZero(roi)
-
-    # Calculate effective area in the ROI
-    effective_area_in_roi = white_pixels_on_center * coefficient
-
-    # Calculate the remaining white pixels in the img
-    white_pixels_off_center = cv2.countNonZero(img) - white_pixels_on_center
-
-    # Step 4: Calculate the combined effective area
-    combined_effective_area = white_pixels_off_center + effective_area_in_roi
-
-    # Calculate the percentage of the effective area
-    total_pixel_count = img.size  # Equivalent to height * width
-    weighted_area_score = (combined_effective_area / total_pixel_count)
-
-    return weighted_area_score
-
 
 # Dany reward function
 
@@ -130,7 +104,7 @@ def split_img_scores(img):
     return split_L_score / max_S, split_C_score / max_C, split_R_score / max_S
 
 
-def calc_reward(img, action, food_collected=0, timesteps=0):
+def calc_reward(img, action, timesteps=0):
     reward = 0
 
     split_L_score, split_C_score, split_R_score = split_img_scores(img)
@@ -161,9 +135,6 @@ def calc_reward(img, action, food_collected=0, timesteps=0):
     if action == 3 and not (split_L_score + split_C_score + split_R_score == 0):
         reward -= 1
 
-    # 1.x multiplier where 0.1 for each food collected
-    reward *= (1 + 0.1 * food_collected)
-
     return reward
 
 
@@ -178,9 +149,7 @@ def translate_action(action):
     # turn 45 degrees right
     elif action == 2:
         return -0.5, 0.5
-    # move backward
-    elif action == 3:
-        return -1, -1
+    # if nothing works return stay still
     return 0, 0
 
 
@@ -190,7 +159,7 @@ class RoboboEnv(gym.Env):
         self.robobo = robobo
 
         # Define action and observation space
-        self.action_space = spaces.Discrete(4)
+        self.action_space = spaces.Discrete(3)
 
         # load example image
         setup_img = set_resolution(process_image(self.get_image()))
@@ -203,8 +172,8 @@ class RoboboEnv(gym.Env):
 
         self.center_multiplier = 5
         # timesteps taken, 900 = 3 mins (with moving = 0.2)
-        self.timesteps = 0
         self.track_reward = []
+        self.state = "RED"  # either "RED" or "GREEN"
 
     def get_image(self):
         img = self.robobo.get_image_front()
@@ -229,12 +198,10 @@ class RoboboEnv(gym.Env):
             #  orientation.yaw, orientation.pitch, orientation.roll
             # self.robobo.set_position((0, 0, 0), (0, 0, 0))
             # also randomize food pos
-        self.timesteps = 0
         return set_resolution(process_image(self.get_image()))
 
     # Execute one time step within the environment
     def step(self, action):
-        self.timesteps += 1
 
         # translate action
         left_motor, right_motor = translate_action(action)
@@ -246,21 +213,7 @@ class RoboboEnv(gym.Env):
         # preprocess image
         image_masked = process_image(self.get_image())
 
-        # test camera
-        # if weighted_area_score > 0:
-        #    cv2.imwrite(str(FIGURES_DIR / f"test_img_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.jpeg"),
-        #                image_masked * 255)
-
-        food_collected = 0
-        if isinstance(self.robobo, SimulationRobobo):
-            food_collected = self.robobo.nr_food_collected()
-
-        if mark_reward:
-            # calculates the weighted area of "food" on camera to determine reward.
-            # low: 0, high: 22 for coefficient=5 (don't ask about the numbers)
-            reward = calculate_weighted_area_score(image_masked, self.center_multiplier)
-        else:
-            reward = calc_reward(image_masked, action, food_collected)
+        reward = calc_reward(image_masked, action)
 
         self.track_reward.append(reward)
 
@@ -269,13 +222,13 @@ class RoboboEnv(gym.Env):
 
         done = False
         # if all food collected
-        if food_collected >= 7:
+        if self.robobo.base_detects_food():
             done = True
-            print("Collected all the food!")
-        # if robot stuck / too much time passed (2400 = 8min) --> restart
-        if isinstance(self.robobo, SimulationRobobo) and self.timesteps > 2400:
+            print("Food collected!")
+        # if robot stuck / too much time passed (480s = 8 min) --> restart
+        if isinstance(self.robobo, SimulationRobobo) and self.robobo.get_sim_time() > 480:
             done = True
-            print("Running out of time :(")
+            print("Ran out of time :(")
 
         return image_masked, reward, done, {}
 
@@ -288,7 +241,7 @@ def run_task2(rob: IRobobo):
     env = RoboboEnv(rob)
 
     config_default = {
-        "batch_size": 32,
+        "batch_size": 64,
         "buffer_size": 10000,
         "exploration_initial_eps": 1.0,
         "exploration_final_eps": 0.01,
@@ -312,51 +265,32 @@ def run_task2(rob: IRobobo):
         for _ in range(100000):
             action, _states = model.predict(obs)
             obs, rewards, dones, info = env.step(action)
-            # env.render() # not implemented
         print("FINISHED RUNNING LOADED MODEL")
 
     else:
         if load_and_train:
+            print("LOADED MODEL")
             model = DQN.load(model_path)
             model.set_env(env)
         else:
             # Create the RL model
             model = DQN("MlpPolicy", env, verbose=1, **config_default)
-
         try:
             # Train the model
+            print("TRAINING MODEL")
             start_time = time()
             model.learn(total_timesteps=100000)
             end_time = time()
-            print(f"runtime: {end_time - start_time:.2f}s")
+            print(f"TRAINING MODEL FINISHED WITH RUNTIME: {end_time - start_time:.2f}s")
         except Exception as e:
             print(e)
         finally:
             # Save the model
             if save_model:
-                save_path = str(MODELS_DIR / f"dqn_robobo_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}")
+                print("SAVING MODEL")
+                save_path = str(MODELS_DIR / f"dqn_robobo_t3_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}")
                 model.save(save_path)
-                print(f'model saved under {save_path}.zip')
-            plot_reward(env.track_reward)
+                print(f'MODEL SAVED UNDER {save_path}.zip')
 
     # close env
     env.close()
-
-
-def plot_reward(reward_data_list):
-    time_points = list(range(1, len(reward_data_list) + 1))
-
-    # Plotting the data
-    plt.figure(figsize=(12, 8))
-    plt.plot(time_points, reward_data_list)
-
-    plt.xlabel('Timestep')
-    plt.ylabel('Reward')
-    plt.title('Reward Data Over Timesteps')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-    # Show plot
-    plt.savefig(str(FIGURES_DIR / "reward_data.png"))
-    plt.show()
