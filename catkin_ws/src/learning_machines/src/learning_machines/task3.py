@@ -41,24 +41,7 @@ def apply_mask(img, state="RED"):
 
 
 def apply_red_mask(img):
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-
-    # Define the lower and upper range for the lower red
-    lower_red = np.array([0, 70, 70])
-    upper_red = np.array([5, 255, 255])
-
-    # Define the lower and upper range for the upper red
-    lower_red2 = np.array([160, 70, 70])
-    upper_red2 = np.array([180, 255, 255])
-
-    # Create masks for the lower and upper red ranges
-    mask1 = cv2.inRange(hsv, lower_red, upper_red)
-    mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
-
-    # Combine the masks
-    mask = cv2.bitwise_or(mask1, mask2)
-
-    return mask
+    return cv2.inRange(img, np.array([115, 70, 70]), np.array([145, 255, 225]))
 
 
 def set_resolution(img, resolution=64):
@@ -71,33 +54,6 @@ def add_noise(img, mean=0, sigma=25):
     gaussian_noise = np.random.normal(mean, sigma, img.shape).astype('uint8')
     noisy_image = cv2.add(img, gaussian_noise)
     return noisy_image
-
-
-def process_image(img):
-    return binarify_image(set_resolution(apply_morphology(apply_mask(img))))
-
-
-def binarify_image(img):
-    _, binary_image = cv2.threshold(img, 1, 255, cv2.THRESH_BINARY)
-    return (binary_image / 255).astype(np.uint8)
-
-
-def process_image_w_noise(img):
-    return binarify_image(apply_morphology(set_resolution(apply_morphology(apply_mask(add_noise(img))))))
-
-
-def apply_morphology(image):
-    # Step 2: Closing operation to fill small holes
-    closing_kernel_size = 5  # Kernel size for closing
-    closing_kernel = np.ones((closing_kernel_size, closing_kernel_size), np.uint8)
-    closed_image = cv2.morphologyEx(image, cv2.MORPH_CLOSE, closing_kernel)
-
-    opening_kernel_size = 3  # Small kernel size for opening
-    opening_kernel = np.ones((opening_kernel_size, opening_kernel_size), np.uint8)
-    opened_image = cv2.morphologyEx(closed_image, cv2.MORPH_OPEN, opening_kernel)
-
-    # Perform the 'opening' operation, which is equivalent to erosion followed by dilation.
-    return opened_image
 
 
 def pooling(mat, ksize, method='max', pad=False):
@@ -139,6 +95,33 @@ def pooling(mat, ksize, method='max', pad=False):
         result = np.nanmean(mat_pad.reshape(new_shape), axis=(1, 3))
 
     return result
+
+
+def process_image(img):
+    return binarify_image(set_resolution(apply_morphology(pooling(apply_mask(img), (4, 4)))))
+
+
+def binarify_image(img):
+    _, binary_image = cv2.threshold(img, 1, 255, cv2.THRESH_BINARY)
+    return (binary_image / 255).astype(np.uint8)
+
+
+def process_image_w_noise(img):
+    return binarify_image(apply_morphology(set_resolution(apply_morphology(apply_mask(add_noise(img))))))
+
+
+def apply_morphology(image):
+    # Step 2: Closing operation to fill small holes
+    closing_kernel_size = 5  # Kernel size for closing
+    closing_kernel = np.ones((closing_kernel_size, closing_kernel_size), np.uint8)
+    closed_image = cv2.morphologyEx(image, cv2.MORPH_CLOSE, closing_kernel)
+
+    opening_kernel_size = 3  # Small kernel size for opening
+    opening_kernel = np.ones((opening_kernel_size, opening_kernel_size), np.uint8)
+    opened_image = cv2.morphologyEx(closed_image, cv2.MORPH_OPEN, opening_kernel)
+
+    # Perform the 'opening' operation, which is equivalent to erosion followed by dilation.
+    return opened_image
 
 
 ####################
@@ -290,10 +273,13 @@ class RoboboEnv(gym.Env):
         reward = get_reward(image_masked, action, self.state)
 
         if reward > 0:
-            image1 = self.robobo.get_image_front()
-            image2 = cv2.cvtColor(apply_red_mask(self.get_image()) * 255, cv2.COLOR_GRAY2BGR)
+            size = 64
+            state = "GREEN"
+            # image1 = set_resolution(self.robobo.get_image_front(), size)
+            image2 = set_resolution(binarify_image(apply_mask(self.get_image(), state)) * 255, size)
+            image3 = set_resolution(binarify_image(pooling(apply_mask(self.get_image(), state), (4, 4))) * 255, size)
             # Concatenate the images horizontally
-            combined_image = cv2.hconcat([image1, image2])
+            combined_image = cv2.hconcat([image2, image3])
 
             cv2.imwrite(str(FIGURES_DIR / f"test_img_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.jpeg"),
                         combined_image)
