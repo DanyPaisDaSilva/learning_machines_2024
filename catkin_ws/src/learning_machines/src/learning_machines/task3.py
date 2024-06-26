@@ -206,12 +206,14 @@ class RoboboEnv(gym.Env):
             self.robobo.set_phone_tilt(105, 50)
             self.robobo.reset_wheels()
 
+        self.state = "RED"
+
             # TODO: check default position in arena_approach.ttt for
             #  position.x, position.y, position.z as well as for
             #  orientation.yaw, orientation.pitch, orientation.roll
             # self.robobo.set_position((0, 0, 0), (0, 0, 0))
             # also randomize food pos
-        return process_image(self.get_image())
+        return spaces.Dict({"mask": binarify_image(process_image(self.get_image())), "red_or_green": 0})
 
     # Execute one time step within the environment
     def step(self, action):
