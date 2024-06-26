@@ -138,6 +138,21 @@ def calc_reward(img, action, timesteps=0):
     return reward
 
 
+def get_reward(img, action=0, state="RED"):
+    if state == "RED":
+        return red_reward(img, action)
+    else:
+        return green_reward(img)
+
+
+def red_reward(img, action):
+    return calc_reward(img, action)
+
+
+def green_reward(img):
+    pass
+
+
 # translates action to left and right movement
 def translate_action(action):
     # move forward
@@ -213,7 +228,7 @@ class RoboboEnv(gym.Env):
         # preprocess image
         image_masked = process_image(self.get_image())
 
-        reward = calc_reward(image_masked, action)
+        reward = get_reward(image_masked, action, self.state)
 
         self.track_reward.append(reward)
 
