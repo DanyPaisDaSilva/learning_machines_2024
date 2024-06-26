@@ -92,10 +92,10 @@ def draw_button(window, text, x, y):
     window.blit(text_surf, text_rect)
 
 
-def set_resolution(img):
+def set_resolution(img, res=64):
     # TODO: check irl resolution of camera
     # sim photo format is (512, 512)
-    return cv2.resize(img, (64, 64))
+    return cv2.resize(img, (res, res))
 
 
 def add_noise(img, mean=0, sigma=25):
@@ -111,12 +111,14 @@ def apply_mask(img):
     return cv2.inRange(hsv, (45, 70, 70), (85, 255, 225))
 
 
-def apply_mask_blue(img):
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    return cv2.inRange(hsv, np.array([105, 70, 70]), np.array([145, 255, 225]))
-
-
+# use this as it uses the same color space as the green filter
+# for the real world the lower bound COULD be np.array([120, 70, 70])
 def apply_mask_red(img):
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    return cv2.inRange(hsv, np.array([115, 70, 70]), np.array([145, 255, 225]))
+
+
+def apply_mask_red_old(img):
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
     # Define the lower and upper range for the lower red
@@ -224,6 +226,20 @@ def find_contours(mask):
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     return contours
 
+def downsample_mask(image):
+    # Ensure the image is in the correct range
+    image = np.clip(image, 0, 255).astype(np.uint8)
+
+    # Apply max pooling
+    max_pooled = cv2.resize(image, (16, 16), interpolation=cv2.INTER_NEAREST)
+
+    # Apply average pooling
+    avg_pooled = cv2.resize(image, (16, 16), interpolation=cv2.INTER_AREA)
+
+    # Combine max pooled and average pooled results
+    combined = np.maximum(max_pooled, avg_pooled)
+
+    return combined
 
 def calculate_blob_area(contour):
     """
@@ -316,7 +332,7 @@ def main():
                             image = add_noise(image)
                     elif 250 <= y <= 300:
                         if image is not None:
-                            image = apply_mask_red_2(image)
+                            image = apply_mask_red(image)
                             print(f"Result: {image}")
                             print(f"Type: {type(image)}")
                     elif 350 <= y <= 400:
@@ -374,23 +390,32 @@ def test_with_images(directory):
         if "test" in os.path.basename(image_path):
             # Read the image
             img = cv2.imread(image_path)
-            # img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
 
             # Apply the red filter mask
-            filtered_img = apply_mask_red(img)
+            filtered_img = apply_mask_red(img_rgb)
+
+            # Downsample the image
+            #set_resolution(filtered_img, 16)
+            #downsampled_img = downsample_mask(filtered_img)
 
             # Convert back to BGR for saving with OpenCV
             filtered_img_bgr = cv2.cvtColor(filtered_img, cv2.COLOR_RGB2BGR)
+            #downsampled_img_bgr = cv2.cvtColor(downsampled_img, cv2.COLOR_RGB2BGR)
 
             # Construct the new file name
             base, ext = os.path.splitext(image_path)
             new_file_name = f"{base}_filtered{ext}"
+            #new_file_name_ds = f"{base}_filtered_ds{ext}"
 
             # Save the filtered image
             cv2.imwrite(new_file_name, filtered_img_bgr)
+            #cv2.imwrite(new_file_name_ds, downsampled_img_bgr)
             print(f"Saved filtered image: {new_file_name}")
+            #print(f"Saved filtered image: {new_file_name_ds}_ds")
 
 
 if __name__ == '__main__':
-    directory = input("Please provide directory")
-    test_with_images(directory)
+    #directory = input("Please provide directory")
+    #test_with_images(directory)
+    main()
