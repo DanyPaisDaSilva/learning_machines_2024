@@ -213,7 +213,7 @@ class RoboboEnv(gym.Env):
             #  orientation.yaw, orientation.pitch, orientation.roll
             # self.robobo.set_position((0, 0, 0), (0, 0, 0))
             # also randomize food pos
-        return spaces.Dict({"mask": binarify_image(process_image(self.get_image())), "red_or_green": 0})
+        return {"mask": binarify_image(process_image(self.get_image())), "red_or_green": 0}
 
     # Execute one time step within the environment
     def step(self, action):
@@ -250,7 +250,7 @@ class RoboboEnv(gym.Env):
             done = True
             print("Ran out of time :(")
 
-        return spaces.Dict({"mask": image_masked, "red_or_green": self.state}), reward, done, {}
+        return {"mask": image_masked, "red_or_green": 0 if self.state == "RED" else 1}, reward, done, {}
 
     def close(self):
         if isinstance(self.robobo, SimulationRobobo):
