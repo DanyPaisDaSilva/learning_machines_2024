@@ -174,7 +174,13 @@ class RoboboEnv(gym.Env):
         low = np.zeros(setup_img.shape)
         high = np.ones(setup_img.shape)
 
-        self.observation_space = spaces.Box(low=low, high=high, dtype=np.uint8)
+        # self.observation_space = spaces.Box(low=low, high=high, dtype=np.uint8)
+        self.observation_space = spaces.Dict(
+            {
+                "mask": spaces.Box(low=low, high=high, dtype=np.uint8),
+                "red_or_green": spaces.Discrete(2)
+            }
+        )
 
         self.center_multiplier = 5
         # timesteps taken, 900 = 3 mins (with moving = 0.2)
@@ -241,7 +247,7 @@ class RoboboEnv(gym.Env):
             done = True
             print("Ran out of time :(")
 
-        return image_masked, reward, done, {}
+        return spaces.Dict({"mask": image_masked, "red_or_green":self.state}), reward, done, {}
 
     def close(self):
         if isinstance(self.robobo, SimulationRobobo):
@@ -285,7 +291,7 @@ def run_task3(rob: IRobobo):
             model.set_env(env)
         else:
             # Create the RL model
-            model = DQN("MlpPolicy", env, verbose=1, **config_default)
+            model = DQN("MultiInputPolicy", env, verbose=1, **config_default)
         try:
             # Train the model
             print("TRAINING MODEL")
