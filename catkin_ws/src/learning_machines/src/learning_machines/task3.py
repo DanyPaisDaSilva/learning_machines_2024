@@ -5,6 +5,7 @@ import numpy as np
 import cv2
 from data_files import FIGURES_DIR, MODELS_DIR
 from matplotlib import pyplot as plt
+import traceback
 from datetime import datetime
 from time import time
 from robobo_interface import (
@@ -74,7 +75,7 @@ def apply_morphology(image):
 
 def process_image(img):
     return binarify_image(set_resolution(max_pooling(apply_mask(img))))
-    #return binarify_image(set_resolution(max_pooling((apply_morphology(apply_mask(img))))))
+    # return binarify_image(set_resolution(max_pooling((apply_morphology(apply_mask(img))))))
 
 
 # RUN CONFIG PARAMETERS
@@ -210,7 +211,7 @@ class RoboboEnv(gym.Env):
             #  orientation.yaw, orientation.pitch, orientation.roll
             # self.robobo.set_position((0, 0, 0), (0, 0, 0))
             # also randomize food pos
-        return set_resolution(process_image(self.get_image()))
+        return process_image(self.get_image())
 
     # Execute one time step within the environment
     def step(self, action):
@@ -247,7 +248,7 @@ class RoboboEnv(gym.Env):
             done = True
             print("Ran out of time :(")
 
-        return spaces.Dict({"mask": image_masked, "red_or_green":self.state}), reward, done, {}
+        return spaces.Dict({"mask": image_masked, "red_or_green": self.state}), reward, done, {}
 
     def close(self):
         if isinstance(self.robobo, SimulationRobobo):
@@ -301,6 +302,7 @@ def run_task3(rob: IRobobo):
             print(f"TRAINING MODEL FINISHED WITH RUNTIME: {end_time - start_time:.2f}s")
         except Exception as e:
             print(e)
+            traceback.print_exc()
         finally:
             # Save the model
             if save_model:
