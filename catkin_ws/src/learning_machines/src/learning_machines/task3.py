@@ -34,13 +34,32 @@ save_model = True
 def apply_mask(img, state="RED"):
     if state == "RED":
         # apply red mask
-        return cv2.inRange(img, (105, 70, 70), (145, 255, 225))
+        return apply_red_mask(img)
     else:
         # apply green mask
         return cv2.inRange(img, (45, 70, 70), (85, 255, 255))
 
+def apply_red_mask(img):
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
-def set_resolution(img, resolution=16):
+    # Define the lower and upper range for the lower red
+    lower_red = np.array([0, 70, 70])
+    upper_red = np.array([5, 255, 255])
+
+    # Define the lower and upper range for the upper red
+    lower_red2 = np.array([160, 70, 70])
+    upper_red2 = np.array([180, 255, 255])
+
+    # Create masks for the lower and upper red ranges
+    mask1 = cv2.inRange(hsv, lower_red, upper_red)
+    mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
+
+    # Combine the masks
+    mask = cv2.bitwise_or(mask1, mask2)
+
+    return mask
+
+def set_resolution(img, resolution=64):
     # sim photo format is (512, 512)
     # irl photo format is (1536, 2048)
     return cv2.resize(img, (resolution, resolution))
@@ -228,8 +247,13 @@ class RoboboEnv(gym.Env):
         reward = get_reward(image_masked, action, self.state)
 
         if reward > 0:
+            image_unmasked = set_resolution(self.robobo.get_image_front())
+
+            # Concatenate the images horizontally
+            combined_image = cv2.hconcat([cv2.cvtColor(image_masked* 255, cv2.COLOR_GRAY2BGR), image_unmasked])
+
             cv2.imwrite(str(FIGURES_DIR / f"test_img_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.jpeg"),
-                        image_masked * 255)
+                        combined_image)
 
         self.track_reward.append(reward)
 

@@ -70,15 +70,20 @@ button_texts = ['Resize Image', 'Add Noise', 'Color Mask', 'Apply Morphology', '
 
 # Dummy variables
 dummy_vars = ['Var 1: N/A', 'Var 2: N/A', 'Var 3: N/A']
+
+
 def import_image(file_path):
     image = cv2.imread(file_path)
     image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     return image
+
+
 def display_image(window, image):
     img_surface = pygame.surfarray.make_surface(image)
     img_rect = img_surface.get_rect(center=(450, 450))
     window.blit(img_surface, img_rect)
+
 
 def draw_button(window, text, x, y):
     pygame.draw.rect(window, GRAY, (x, y, button_width, button_height))
@@ -86,25 +91,30 @@ def draw_button(window, text, x, y):
     text_rect = text_surf.get_rect(center=(x + button_width // 2, y + button_height // 2))
     window.blit(text_surf, text_rect)
 
+
 def set_resolution(img):
     # TODO: check irl resolution of camera
     # sim photo format is (512, 512)
     return cv2.resize(img, (64, 64))
+
+
 def add_noise(img, mean=0, sigma=25):
     gaussian_noise = np.random.normal(mean, sigma, img.shape).astype('uint8')
     noisy_image = cv2.add(img, gaussian_noise)
     return noisy_image
 
+
 # Bright green: 119, 96, 45
 # Dark green: 120, 100, 33
 def apply_mask(img):
-    # TODO: test if this is good for both sim and irl
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     return cv2.inRange(hsv, (45, 70, 70), (85, 255, 225))
+
 
 def apply_mask_blue(img):
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     return cv2.inRange(hsv, np.array([105, 70, 70]), np.array([145, 255, 225]))
+
 
 def apply_mask_red(img):
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -126,6 +136,7 @@ def apply_mask_red(img):
 
     return mask
 
+
 def calculate_weighted_area_score(mask, coefficient):
     height, width = mask.shape
     center_width = width // 2
@@ -154,6 +165,7 @@ def calculate_weighted_area_score(mask, coefficient):
     weighted_area_score = (combined_effective_area / total_pixel_count) * 100 * 10
 
     return weighted_area_score
+
 
 def apply_morphology(image):
     # Step 2: Closing operation to fill small holes
@@ -167,8 +179,8 @@ def apply_morphology(image):
 
     # Perform the 'opening' operation, which is equivalent to erosion followed by dilation.
     return opened_image
-    
-    
+
+
 def calculate_weighted_area_score(mask, coefficient):
     height, width = mask.shape
     center_width = width // 2
@@ -198,6 +210,7 @@ def calculate_weighted_area_score(mask, coefficient):
 
     return weighted_area_score
 
+
 def find_contours(mask):
     """
     Find contours in the binary mask.
@@ -210,6 +223,8 @@ def find_contours(mask):
     """
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     return contours
+
+
 def calculate_blob_area(contour):
     """
     Calculate the area of a contour.
@@ -221,6 +236,7 @@ def calculate_blob_area(contour):
     float: Area of the contour.
     """
     return cv2.contourArea(contour)
+
 
 def get_largest_blob_area(contours):
     """
@@ -237,6 +253,8 @@ def get_largest_blob_area(contours):
 
     largest_contour = max(contours, key=cv2.contourArea)
     return calculate_blob_area(largest_contour)
+
+
 def draw_contours(image, contours):
     """
     Draw each contour in a different color on the image.
@@ -257,12 +275,16 @@ def draw_contours(image, contours):
         cv2.drawContours(image_with_contours, [contour], -1, color, 2)  # Random color, thickness 2
 
     return image_with_contours
+
+
 def reset_image(original_image):
     return original_image.copy()
+
 
 def operation4(image):
     # Dummy operation: Edge Detection
     return cv2.Canny(image, 100, 200)
+
 
 def display_dummy_vars(window, dummy_vars):
     y_offset = 800
@@ -331,13 +353,14 @@ def main():
             draw_button(window, text, 950, 50 + i * 100)
 
         # Display dummy variables
-        #display_dummy_vars(window, dummy_vars)
+        # display_dummy_vars(window, dummy_vars)
 
         pygame.display.flip()
         clock.tick(30)
 
     pygame.quit()
     sys.exit()
+
 
 def test_with_images(directory):
     supported_extensions = ['*.jpeg', '*.jpg', '*.png']
@@ -351,7 +374,7 @@ def test_with_images(directory):
         if "test" in os.path.basename(image_path):
             # Read the image
             img = cv2.imread(image_path)
-            #img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
+            # img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
 
             # Apply the red filter mask
             filtered_img = apply_mask_red(img)
