@@ -34,8 +34,9 @@ TASK FLOWCHART
 - Collide with it! (move forward until it disappears)
 - If you do not see green, reward the robot for turning (UNTIL green is seen, then punish staying in place)
 """
-
+import os
 import random
+from glob import glob
 
 import pygame
 import cv2
@@ -101,23 +102,19 @@ def apply_mask(img):
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     return cv2.inRange(hsv, (45, 70, 70), (85, 255, 225))
 
-
-"""
-np.array([85, 70, 70]), np.array([179, 255, 225]
-"""
-def apply_mask_red(img):
+def apply_mask_blue(img):
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     return cv2.inRange(hsv, np.array([105, 70, 70]), np.array([145, 255, 225]))
 
-def apply_mask_red_2(img):
-    hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
+def apply_mask_red(img):
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
     # Define the lower and upper range for the lower red
-    lower_red = np.array([0, 50, 50])
-    upper_red = np.array([10, 255, 255])
+    lower_red = np.array([0, 70, 70])
+    upper_red = np.array([5, 255, 255])
 
     # Define the lower and upper range for the upper red
-    lower_red2 = np.array([170, 50, 50])
+    lower_red2 = np.array([160, 70, 70])
     upper_red2 = np.array([180, 255, 255])
 
     # Create masks for the lower and upper red ranges
@@ -342,6 +339,35 @@ def main():
     pygame.quit()
     sys.exit()
 
+def test_with_images(directory):
+    supported_extensions = ['*.jpeg', '*.jpg', '*.png']
+    images_paths = []
+
+    # Collect all image paths
+    for ext in supported_extensions:
+        images_paths.extend(glob(os.path.join(directory, ext)))
+
+    for image_path in images_paths:
+        if "test" in os.path.basename(image_path):
+            # Read the image
+            img = cv2.imread(image_path)
+            #img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
+
+            # Apply the red filter mask
+            filtered_img = apply_mask_red(img)
+
+            # Convert back to BGR for saving with OpenCV
+            filtered_img_bgr = cv2.cvtColor(filtered_img, cv2.COLOR_RGB2BGR)
+
+            # Construct the new file name
+            base, ext = os.path.splitext(image_path)
+            new_file_name = f"{base}_filtered{ext}"
+
+            # Save the filtered image
+            cv2.imwrite(new_file_name, filtered_img_bgr)
+            print(f"Saved filtered image: {new_file_name}")
+
 
 if __name__ == '__main__':
-    main()
+    directory = input("Please provide directory")
+    test_with_images(directory)
