@@ -43,8 +43,6 @@ import numpy as np
 import sys
 from pygame.locals import *
 
-from catkin_ws.src.learning_machines.src.learning_machines.task2 import apply_morphology, calculate_weighted_area_score
-
 # Initialize Pygame
 pygame.init()
 
@@ -73,6 +71,7 @@ button_texts = ['Resize Image', 'Add Noise', 'Color Mask', 'Apply Morphology', '
 dummy_vars = ['Var 1: N/A', 'Var 2: N/A', 'Var 3: N/A']
 def import_image(file_path):
     image = cv2.imread(file_path)
+    image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     return image
 def display_image(window, image):
@@ -89,7 +88,7 @@ def draw_button(window, text, x, y):
 def set_resolution(img):
     # TODO: check irl resolution of camera
     # sim photo format is (512, 512)
-    return cv2.resize(img, (128, 128))
+    return cv2.resize(img, (64, 64))
 def add_noise(img, mean=0, sigma=25):
     gaussian_noise = np.random.normal(mean, sigma, img.shape).astype('uint8')
     noisy_image = cv2.add(img, gaussian_noise)
@@ -101,22 +100,36 @@ def apply_mask(img):
     # TODO: test if this is good for both sim and irl
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     return cv2.inRange(hsv, (45, 70, 70), (85, 255, 225))
+
+
 """
-def apply_morphology(image):
-    # Step 2: Closing operation to fill small holes
-    closing_kernel_size = 5  # Kernel size for closing
-    closing_kernel = np.ones((closing_kernel_size, closing_kernel_size), np.uint8)
-    closed_image = cv2.morphologyEx(image, cv2.MORPH_CLOSE, closing_kernel)
+np.array([85, 70, 70]), np.array([179, 255, 225]
+"""
+def apply_mask_red(img):
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    return cv2.inRange(hsv, np.array([105, 70, 70]), np.array([145, 255, 225]))
 
-    opening_kernel_size = 3  # Small kernel size for opening
-    opening_kernel = np.ones((opening_kernel_size, opening_kernel_size), np.uint8)
-    opened_image = cv2.morphologyEx(closed_image, cv2.MORPH_OPEN, opening_kernel)
+def apply_mask_red_2(img):
+    hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
 
-    # Perform the 'opening' operation, which is equivalent to erosion followed by dilation.
-    return opened_image
-    
-    
-    def calculate_weighted_area_score(mask, coefficient):
+    # Define the lower and upper range for the lower red
+    lower_red = np.array([0, 50, 50])
+    upper_red = np.array([10, 255, 255])
+
+    # Define the lower and upper range for the upper red
+    lower_red2 = np.array([170, 50, 50])
+    upper_red2 = np.array([180, 255, 255])
+
+    # Create masks for the lower and upper red ranges
+    mask1 = cv2.inRange(hsv, lower_red, upper_red)
+    mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
+
+    # Combine the masks
+    mask = cv2.bitwise_or(mask1, mask2)
+
+    return mask
+
+def calculate_weighted_area_score(mask, coefficient):
     height, width = mask.shape
     center_width = width // 2
 
@@ -145,7 +158,49 @@ def apply_morphology(image):
 
     return weighted_area_score
 
-"""
+def apply_morphology(image):
+    # Step 2: Closing operation to fill small holes
+    closing_kernel_size = 5  # Kernel size for closing
+    closing_kernel = np.ones((closing_kernel_size, closing_kernel_size), np.uint8)
+    closed_image = cv2.morphologyEx(image, cv2.MORPH_CLOSE, closing_kernel)
+
+    opening_kernel_size = 3  # Small kernel size for opening
+    opening_kernel = np.ones((opening_kernel_size, opening_kernel_size), np.uint8)
+    opened_image = cv2.morphologyEx(closed_image, cv2.MORPH_OPEN, opening_kernel)
+
+    # Perform the 'opening' operation, which is equivalent to erosion followed by dilation.
+    return opened_image
+    
+    
+def calculate_weighted_area_score(mask, coefficient):
+    height, width = mask.shape
+    center_width = width // 2
+
+    # Define region of interest
+    left_bound = int(center_width - 0.15 * width)
+    right_bound = int(center_width + 0.15 * width)
+
+    # Extract ROI
+    roi = mask[:, left_bound:right_bound]
+
+    # Count white pixels in ROI
+    white_pixels_on_center = cv2.countNonZero(roi)
+
+    # Calculate effective area in the ROI
+    effective_area_in_roi = white_pixels_on_center * coefficient
+
+    # Calculate the remaining white pixels in the mask
+    white_pixels_off_center = cv2.countNonZero(mask) - white_pixels_on_center
+
+    # Step 4: Calculate the combined effective area
+    combined_effective_area = white_pixels_off_center + effective_area_in_roi
+
+    # Calculate the percentage of the effective area
+    total_pixel_count = mask.size  # Equivalent to height * width
+    weighted_area_score = (combined_effective_area / total_pixel_count) * 100 * 10
+
+    return weighted_area_score
+
 def find_contours(mask):
     """
     Find contours in the binary mask.
@@ -242,13 +297,18 @@ def main():
                             image = add_noise(image)
                     elif 250 <= y <= 300:
                         if image is not None:
-                            image = apply_mask(image)
+                            image = apply_mask_red_2(image)
+                            print(f"Result: {image}")
+                            print(f"Type: {type(image)}")
                     elif 350 <= y <= 400:
                         if image is not None:
                             image = apply_morphology(image)
                             area = calculate_weighted_area_score(image, 5)
                             print(f"Area: {area}")
                             display_dummy_vars(window, dummy_vars=[f"{area}"])
+                            print(f"Result: {image}")
+                            print(f"Type: {type(image)}")
+
                     elif 450 <= y <= 500:
                         if image is not None:
                             image = draw_contours(image, find_contours(image))
