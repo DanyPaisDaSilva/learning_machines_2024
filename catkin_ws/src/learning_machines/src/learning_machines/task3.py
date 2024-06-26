@@ -44,7 +44,7 @@ def apply_red_mask(img):
     return mask1 + mask2
 
 
-def set_resolution(img, resolution=64):
+def set_resolution(img, resolution=16):
     # sim photo format is (512, 512)
     # irl photo format is (1536, 2048)
     return cv2.resize(img, (resolution, resolution))
@@ -231,12 +231,14 @@ class RoboboEnv(gym.Env):
             self.robobo.set_phone_tilt(105, 50)
             self.robobo.reset_wheels()
 
+            self.state = "RED"
+
             # TODO: check default position in arena_approach.ttt for
             #  position.x, position.y, position.z as well as for
             #  orientation.yaw, orientation.pitch, orientation.roll
             # self.robobo.set_position((0, 0, 0), (0, 0, 0))
             # also randomize food pos
-        return set_resolution(process_image(self.get_image()))
+        return spaces.Dict({"mask": binarify_image(process_image(self.get_image())), "red_or_green": 0})
 
     # Execute one time step within the environment
     def step(self, action):
