@@ -186,7 +186,12 @@ class RoboboEnv(gym.Env):
         )
 
         self.center_multiplier = 5
-        self.track_reward = []
+
+        self.stats = {
+            "reward":[],
+            "state":[],
+            "action":[]
+        }
         self.state = "RED"  # either "RED" or "GREEN"
         self.red_c_history = [0] * 10  # gives history of last 0.2*size (0.2*10 = 2s)
 
@@ -280,7 +285,9 @@ class RoboboEnv(gym.Env):
         #    cv2.imwrite(str(FIGURES_DIR / f"test_img_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.jpeg"),
         #                image_masked * 255)
 
-        self.track_reward.append(reward)
+        self.stats["reward"].append(reward)
+        self.stats["state"].append(1 if self.state == "RED" else 0)
+        self.stats["action"].append(action)
 
         if print_output:
             print(f"ACTION {action} with REWARD: {reward}")
@@ -357,10 +364,28 @@ def run_task3(rob: IRobobo):
                 save_path = str(MODELS_DIR / f"dqn_robobo_t3_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}")
                 model.save(save_path)
                 print(f'MODEL SAVED UNDER {save_path}.zip')
+            for (k,v) in env.stats:
+                plot_stat(v, k)
 
     # close env
     env.close()
 
+def plot_stat(stat_list, stat_name):
+    time_points = list(range(1, len(stat_list) + 1))
+
+    # Plotting the data
+    plt.figure(figsize=(12, 8))
+    plt.plot(time_points, stat_list)
+
+    plt.xlabel('Timestep')
+    plt.ylabel(f"{stat_name.capitalize()}")
+    plt.title(f"{stat_name.capitalize()} Data Over Timesteps")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+    # Show plot
+    plt.savefig(str(FIGURES_DIR / f"{stat_name}_data.png"))
 
 # big image testing
 """
