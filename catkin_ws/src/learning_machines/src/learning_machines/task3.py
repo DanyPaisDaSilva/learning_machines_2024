@@ -24,7 +24,7 @@ from robobo_interface.datatypes import (
 # RUN CONFIG PARAMETERS
 
 load_model = False
-load_and_train = True  # load_model has to be False
+load_and_train = False  # load_model has to be False
 model_path = str(MODELS_DIR / "dqn_robobo_t3_2024-06-27_15-47-13.zip")
 
 print_output = True  # mostly for reward and action output
@@ -195,6 +195,7 @@ class RoboboEnv(gym.Env):
         self.track_reward = []
         self.state = "RED"  # either "RED" or "GREEN"
         self.red_c_history = [0] * 50  # gives history of last 0.2*size (0.2*120 = 10s) seconds
+        self.green_cooldown = 50  # cooldown of 50 * 0.2s = 10s, used to force being in green state
 
     def red_hist_insert(self, red_c_state):
         self.red_c_history.pop()
@@ -208,7 +209,7 @@ class RoboboEnv(gym.Env):
         front_c_sensor_data = self.robobo.read_irs()[4]
         print(f"front C sensor data {front_c_sensor_data:.2f}")
         if isinstance(self.robobo, SimulationRobobo):
-            treshold = 15  # min 34
+            treshold = 25  # min 34
         else:
             treshold = 50  # min 66
 
@@ -217,19 +218,24 @@ class RoboboEnv(gym.Env):
             if sum(self.red_c_history) / len(self.red_c_history) > 0:
                 if self.state == "RED":
                     if print_output: print("Changed to GREEN state")
+                    self.green_cooldown = 50
                     self.state = "GREEN"
                 # if false, keep GREEN state
             else:
                 if self.state == "GREEN":
-                    if print_output: print("Changed to RED state")
-                    self.state = "RED"
+                    if self.green_cooldown > 0:
+                        self.green_cooldown -= 1
+                    else:
+                        if print_output: print("Changed to RED state")
+                        self.state = "RED"
                 # if false, keep RED state
         else:
-            if self.state == "GREEN":
+            if self.green_cooldown > 0:
+                self.green_cooldown -= 1
+            else:
                 if print_output: print("Changed to RED state")
                 self.state = "RED"
             # if false, keep RED state
-
 
     def get_image(self):
         img = self.robobo.get_image_front()
@@ -248,7 +254,6 @@ class RoboboEnv(gym.Env):
             # reset phone tilt & wheels
             self.robobo.set_phone_tilt(105, 50)
             self.robobo.set_phone_pan(180, 50)
-            print(f"FUCKING PHONE PAN {self.robobo.read_phone_pan()}")
             self.robobo.reset_wheels()
 
         self.state = "GREEN"
