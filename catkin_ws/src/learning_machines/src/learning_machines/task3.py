@@ -30,7 +30,7 @@ model_path = str(MODELS_DIR / "dqn_robobo_t3_2024-06-27_15-47-13.zip")
 print_output = True  # mostly for reward and action output
 save_model = True
 extended_error = False
-
+draw_graph = False
 
 ##################
 # CV2 operations #
@@ -145,7 +145,9 @@ def get_reward(img, action, rob_base_distance=0):
         if action == 1 or action == 2:
             reward = 0.2
 
-    reward += rob_base_distance
+    # max value is 2.4+-
+    if rob_base_distance != 0:
+        reward += 2-rob_base_distance
 
     return reward, red_c_center
 
@@ -191,7 +193,8 @@ class RoboboEnv(gym.Env):
         self.center_multiplier = 5
         self.track_reward = []
         self.state = "RED"  # either "RED" or "GREEN"
-        self.red_c_history = [0] * 10  # gives history of last 0.2*size (0.2*10 = 2s)
+        self.red_c_history = [0] * 10  # gives history of last 0.2*size (0.2*10 = 2s) seconds
+        self.grab_flag = False
 
     def red_hist_insert(self, red_c_state):
         self.red_c_history.pop()
@@ -279,7 +282,6 @@ class RoboboEnv(gym.Env):
         image_masked = process_image(self.get_image())
 
         rob_green_dist = self.calc_distance_robobo_base()
-
         reward, red_c_state = get_reward(image_masked, action, rob_green_dist)
 
         # update red history
