@@ -256,6 +256,9 @@ class RoboboEnv(gym.Env):
             self.robobo.set_phone_tilt(109, 50)
             self.robobo.reset_wheels()
 
+        # reset position history
+        self.position_history = []
+
         self.state = "GREEN"
         self.red_c_history = [0]
         return {"mask": binarify_image(process_image(self.get_image())), "red_or_green": 0}
@@ -293,8 +296,11 @@ class RoboboEnv(gym.Env):
 
         # position check to determine if robobo is in a new area
         # values are discretized to make a split between areas
-        position = self.robobo.get_position()
-        pos_discrete = [position.x // 0.2, position.y // 0.2]
+        if isinstance(self.robobo, SimulationRobobo):
+            position = self.robobo.get_position()
+            pos_discrete = [position.x // 0.2, position.y // 0.2]
+        else:
+            pos_discrete = [0.0, 0.0]
         new_area = True if pos_discrete not in self.position_history else False
 
         reward, red_c_state = get_reward(image_masked, action, new_area, rob_green_dist)
