@@ -194,7 +194,7 @@ class RoboboEnv(gym.Env):
         self.center_multiplier = 5
         self.track_reward = []
         self.state = "RED"  # either "RED" or "GREEN"
-        self.red_c_history = [0] * 100  # gives history of last 0.2*size (0.2*10 = 2s) seconds
+        self.red_c_history = [0] * 50  # gives history of last 0.2*size (0.2*120 = 10s) seconds
 
     def red_hist_insert(self, red_c_state):
         self.red_c_history.pop()
@@ -246,6 +246,8 @@ class RoboboEnv(gym.Env):
 
             # reset phone tilt & wheels
             self.robobo.set_phone_tilt(105, 50)
+            self.robobo.set_phone_pan(180, 50)
+            print(f"FUCKING PHONE PAN {self.robobo.read_phone_pan()}")
             self.robobo.reset_wheels()
 
         self.state = "GREEN"
@@ -296,7 +298,7 @@ class RoboboEnv(gym.Env):
 
         if print_output and rob_green_dist != 0:
             print(
-                f"ACTION {action} with REWARD: {reward} in sate: {self.state} and red_to_green_distance: {rob_green_dist}")
+                f"ACTION {action} with REWARD: {reward:.4f} in sate: {self.state} and red_to_green_distance: {rob_green_dist:.2f}")
         elif print_output:
             print(f"ACTION {action} with REWARD: {reward} in sate: {self.state}")
 
