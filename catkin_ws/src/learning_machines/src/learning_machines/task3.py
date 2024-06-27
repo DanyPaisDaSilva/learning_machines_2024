@@ -251,6 +251,7 @@ class RoboboEnv(gym.Env):
 
     def calc_distance_robobo_base(self):
         if isinstance(self.robobo, SimulationRobobo):
+            self.state = "GREEN"
             if self.state == "GREEN":
                 robobo_pos = self.robobo.get_position()
                 base_pos = self.robobo.base_position()
