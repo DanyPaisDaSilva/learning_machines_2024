@@ -125,7 +125,7 @@ def get_reward(img, action, food_base_distance=0):
         # reward going forward when a lot of green in center
         if action == 0:
             reward += 2
-        red_center = True
+        red_c_center = True
     elif split_R_score < split_L_score:
         reward = split_L_score + 0.5
         # reward turning in the right direction
@@ -140,11 +140,11 @@ def get_reward(img, action, food_base_distance=0):
     else:
         # reward turning if nothing can be seen
         if action == 1 or action == 2:
-            reward = 0.5
+            reward = 0.1
 
     reward += food_base_distance
 
-    return reward, red_center
+    return reward, red_c_center
 
 
 # translates action to left and right movement
@@ -188,14 +188,14 @@ class RoboboEnv(gym.Env):
         self.center_multiplier = 5
         self.track_reward = []
         self.state = "RED"  # either "RED" or "GREEN"
-        self.red_cv_history = [0] * 10  # gives history of last 0.2*size (0.2*10 = 2s)
+        self.red_c_history = [0] * 10  # gives history of last 0.2*size (0.2*10 = 2s)
 
     def red_hist_insert(self, red_c_state):
-        self.red_cv_history.pop()
+        self.red_c_history.pop()
         if red_c_state:
-            self.red_cv_history.insert(0, 1)
+            self.red_c_history.insert(0, 1)
         else:
-            self.red_cv_history.insert(0, 0)
+            self.red_c_history.insert(0, 0)
 
     def check_grabbing(self):
         # robobo.read_iris()[4] = FrontC sensor data
@@ -207,8 +207,8 @@ class RoboboEnv(gym.Env):
             treshold = 50  # min 66
 
         if front_c_sensor_data > treshold:
-            # calc avg of red_cv_history
-            if sum(self.red_cv_history) / len(self.red_cv_history) > 0:
+            # calc avg of red_c_history
+            if sum(self.red_c_history) / len(self.red_c_history) > 0:
                 if self.state == "RED":
                     if print_output: print("Changed to GREEN state")
                     self.state = "GREEN"
@@ -241,7 +241,7 @@ class RoboboEnv(gym.Env):
             self.robobo.reset_wheels()
 
         self.state = "RED"
-        self.red_cv_history = [0]
+        self.red_c_history = [0]
         return {"mask": binarify_image(process_image(self.get_image())), "red_or_green": 0}
 
     # Execute one time step within the environment
@@ -257,12 +257,22 @@ class RoboboEnv(gym.Env):
         # preprocess image
         image_masked = process_image(self.get_image())
 
-        reward = get_reward(image_masked, action)
+        red_to_green_distance = 0
+        if isinstance(self.robobo, SimulationRobobo):
+            red_to_green_distance = self.robobo._base_food_distance()
+            print(f"red_to_green_distance: {red_to_green_distance}")
+
+        reward, red_c_state = get_reward(image_masked, action, red_to_green_distance)
+
+        # update red history
+        self.red_hist_insert(red_c_state)
+        # check grab
+        self.check_grabbing()
 
         # cam test
-        if reward > 0:
-            cv2.imwrite(str(FIGURES_DIR / f"test_img_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.jpeg"),
-                        image_masked * 255)
+        # if reward > 0:
+        #    cv2.imwrite(str(FIGURES_DIR / f"test_img_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.jpeg"),
+        #                image_masked * 255)
 
         self.track_reward.append(reward)
 
@@ -279,7 +289,7 @@ class RoboboEnv(gym.Env):
             done = True
             print("Ran out of time :(")
 
-        return {"mask": image_masked, "red_or_green": 0 if self.state == "RED" else 1}, reward, done, {}
+        return {"mask": image_masked, "red_or_green": 1 if self.state == "RED" else 0}, reward, done, {}
 
     def close(self):
         if isinstance(self.robobo, SimulationRobobo):
