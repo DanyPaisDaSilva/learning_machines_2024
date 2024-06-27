@@ -248,9 +248,7 @@ class RoboboEnv(gym.Env):
 
     def calc_distance_robobo_base(self):
         if isinstance(self.robobo, SimulationRobobo):
-            if self.state == "RED":
-                return 0
-            else:
+            if self.state == "GREEN":
                 distance = np.linalg.norm(np.array(self.robobo.base_position()) - np.array(self.robobo.get_position()))
                 if distance != 0:
                     print(f"red_to_green_distance: {distance}")
