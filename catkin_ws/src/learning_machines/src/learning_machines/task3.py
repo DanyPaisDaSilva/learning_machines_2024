@@ -116,9 +116,10 @@ def split_img_scores(img):
     return split_L_score / max_value, split_C_score / (max_value - 5), split_R_score / max_value
 
 
-def get_reward(img, action, rob_base_distance=0):
+def get_reward(img, action, new_area, rob_base_distance=0):
     reward = 0
     red_c_center = False
+
 
     split_L_score, split_C_score, split_R_score = split_img_scores(img)
 
@@ -141,6 +142,8 @@ def get_reward(img, action, rob_base_distance=0):
             reward += 1
     # if they are equal (i.e. (0, 0, 0) )
     else:
+        if new_area:
+            reward = 0.3
         # reward turning if nothing can be seen
         if action == 1 or action == 2:
             reward = 0.2
@@ -200,6 +203,7 @@ class RoboboEnv(gym.Env):
         self.state = "RED"  # either "RED" or "GREEN"
         self.red_c_history = [0] * 10  # gives history of last 0.2*size (0.2*10 = 2s) seconds
         self.grab_flag = False
+        self.position_history = []
 
     def red_hist_insert(self, red_c_state):
         self.red_c_history.pop()
@@ -222,6 +226,8 @@ class RoboboEnv(gym.Env):
             if sum(self.red_c_history) / len(self.red_c_history) > 0:
                 if self.state == "RED":
                     if print_output: print("Changed to GREEN state")
+                    # we reset position history so it searches for green as well
+                    self.position_history = []
                     self.state = "GREEN"
                 # if false, keep GREEN state
             else:
@@ -287,7 +293,19 @@ class RoboboEnv(gym.Env):
         image_masked = process_image(self.get_image())
 
         rob_green_dist = self.calc_distance_robobo_base()
-        reward, red_c_state = get_reward(image_masked, action, rob_green_dist)
+
+        # position check to determine if robobo is in a new area
+        # values are discretized to make a split between areas
+        position = self.robobo.get_position()
+        pos_discrete = [position.x // 0.2, position.y // 0.2]
+        if pos_discrete not in self.position_history:
+            new_area = True
+
+        reward, red_c_state = get_reward(image_masked, action, new_area, rob_green_dist)
+
+        # add new location to the history
+        if new_area:
+            self.position_history.append(pos_discrete)
 
         # update red history
         self.red_hist_insert(red_c_state)
