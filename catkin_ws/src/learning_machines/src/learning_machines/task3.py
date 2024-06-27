@@ -115,6 +115,7 @@ def split_img_scores(img):
 
 def get_reward(img, action, food_base_distance=0):
     reward = 0
+    red_c_center = False
 
     split_L_score, split_C_score, split_R_score = split_img_scores(img)
 
@@ -124,6 +125,7 @@ def get_reward(img, action, food_base_distance=0):
         # reward going forward when a lot of green in center
         if action == 0:
             reward += 2
+        red_center = True
     elif split_R_score < split_L_score:
         reward = split_L_score + 0.5
         # reward turning in the right direction
@@ -142,7 +144,7 @@ def get_reward(img, action, food_base_distance=0):
 
     reward += food_base_distance
 
-    return reward
+    return reward, red_center
 
 
 # translates action to left and right movement
@@ -184,9 +186,41 @@ class RoboboEnv(gym.Env):
         )
 
         self.center_multiplier = 5
-        # timesteps taken, 900 = 3 mins (with moving = 0.2)
         self.track_reward = []
         self.state = "RED"  # either "RED" or "GREEN"
+        self.red_cv_history = [0] * 10  # gives history of last 0.2*size (0.2*10 = 2s)
+
+    def red_hist_insert(self, red_c_state):
+        self.red_cv_history.pop()
+        if red_c_state:
+            self.red_cv_history.insert(0, 1)
+        else:
+            self.red_cv_history.insert(0, 0)
+
+    def check_grabbing(self):
+        # robobo.read_iris()[4] = FrontC sensor data
+        front_c_sensor_data = self.robobo.read_iris()[4]
+
+        if isinstance(self.robobo, SimulationRobobo):
+            treshold = 20  # min 34
+        else:
+            treshold = 50  # min 66
+
+        if front_c_sensor_data > treshold:
+            # calc avg of red_cv_history
+            if sum(self.red_cv_history) / len(self.red_cv_history) > 0:
+                if self.state == "RED":
+                    if print_output: print("Changed to GREEN state")
+                    self.state = "GREEN"
+                # if false, keep GREEN state
+            else:
+                if print_output: print("Changed to RED state")
+                self.state = "RED"
+        else:
+            if self.state == "GREEN":
+                if print_output: print("Changed to RED state")
+                self.state = "RED"
+            # if false, keep RED state
 
     def get_image(self):
         img = self.robobo.get_image_front()
@@ -207,12 +241,7 @@ class RoboboEnv(gym.Env):
             self.robobo.reset_wheels()
 
         self.state = "RED"
-
-            # TODO: check default position in arena_approach.ttt for
-            #  position.x, position.y, position.z as well as for
-            #  orientation.yaw, orientation.pitch, orientation.roll
-            # self.robobo.set_position((0, 0, 0), (0, 0, 0))
-            # also randomize food pos
+        self.red_cv_history = [0]
         return {"mask": binarify_image(process_image(self.get_image())), "red_or_green": 0}
 
     # Execute one time step within the environment
