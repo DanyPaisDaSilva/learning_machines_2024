@@ -17,7 +17,20 @@ from robobo_interface import (
     SimulationRobobo,
     HardwareRobobo,
 )
+from robobo_interface.datatypes import (
+    Position
+)
 
+# RUN CONFIG PARAMETERS
+
+load_model = False
+load_and_train = True  # load_model has to be False
+model_path = str(MODELS_DIR / "dqn_robobo_t3_2024-06-27_15-47-13.zip")
+
+print_output = True  # mostly for reward and action output
+save_model = True
+extended_error = False
+draw_graph = False
 
 ##################
 # CV2 operations #
@@ -78,16 +91,6 @@ def process_image(img):
     # return binarify_image(set_resolution(max_pooling((apply_morphology(apply_mask(img))))))
 
 
-# RUN CONFIG PARAMETERS
-
-load_model = False
-load_and_train = False  # load_model has to be False
-model_path = str(MODELS_DIR / "dqn_robobo_2024-06-21_10-56-04.zip")
-
-print_output = True  # mostly for reward and action output
-save_model = True
-
-
 ####################
 # static functions #
 ####################
@@ -113,7 +116,7 @@ def split_img_scores(img):
     return split_L_score / max_value, split_C_score / (max_value - 5), split_R_score / max_value
 
 
-def get_reward(img, action, food_base_distance=0):
+def get_reward(img, action, rob_base_distance=0):
     reward = 0
     red_c_center = False
 
@@ -140,9 +143,11 @@ def get_reward(img, action, food_base_distance=0):
     else:
         # reward turning if nothing can be seen
         if action == 1 or action == 2:
-            reward = 0.1
+            reward = 0.2
 
-    reward += food_base_distance
+    # max value is 2.4+-
+    if rob_base_distance != 0:
+        reward += 2-rob_base_distance
 
     return reward, red_c_center
 
@@ -154,10 +159,10 @@ def translate_action(action):
         return 1, 1
     # turn 45 degrees left
     elif action == 1:
-        return 0.5, 0
+        return 0.5, -0.2
     # turn 45 degrees right
     elif action == 2:
-        return 0, 0.5
+        return -0.2, 0.5
     # if nothing works return stay still
     return 0, 0
 
@@ -193,7 +198,8 @@ class RoboboEnv(gym.Env):
             "action":[]
         }
         self.state = "RED"  # either "RED" or "GREEN"
-        self.red_c_history = [0] * 10  # gives history of last 0.2*size (0.2*10 = 2s)
+        self.red_c_history = [0] * 10  # gives history of last 0.2*size (0.2*10 = 2s) seconds
+        self.grab_flag = False
 
     def red_hist_insert(self, red_c_state):
         self.red_c_history.pop()
@@ -203,9 +209,9 @@ class RoboboEnv(gym.Env):
             self.red_c_history.insert(0, 0)
 
     def check_grabbing(self):
-        # robobo.read_iris()[4] = FrontC sensor data
-        front_c_sensor_data = self.robobo.read_iris()[4]
-
+        # robobo.read_irs()[4] = FrontC sensor data
+        front_c_sensor_data = self.robobo.read_irs()[4]
+        print(f"front C sensor data {front_c_sensor_data:.2f}")
         if isinstance(self.robobo, SimulationRobobo):
             treshold = 20  # min 34
         else:
@@ -219,8 +225,10 @@ class RoboboEnv(gym.Env):
                     self.state = "GREEN"
                 # if false, keep GREEN state
             else:
-                if print_output: print("Changed to RED state")
-                self.state = "RED"
+                if self.state == "GREEN":
+                    if print_output: print("Changed to RED state")
+                    self.state = "RED"
+                # if false, keep RED state
         else:
             if self.state == "GREEN":
                 if print_output: print("Changed to RED state")
@@ -242,12 +250,28 @@ class RoboboEnv(gym.Env):
             self.robobo.play_simulation()
 
             # reset phone tilt & wheels
-            self.robobo.set_phone_tilt(105, 50)
+            self.robobo.set_phone_tilt(109, 50)
             self.robobo.reset_wheels()
 
-        self.state = "RED"
+        self.state = "GREEN"
         self.red_c_history = [0]
         return {"mask": binarify_image(process_image(self.get_image())), "red_or_green": 0}
+
+    def calc_distance_robobo_base(self):
+        if isinstance(self.robobo, SimulationRobobo):
+            self.state = "GREEN"
+            if self.state == "GREEN":
+                robobo_pos = self.robobo.get_position()
+                base_pos = self.robobo.base_position()
+
+                robobo_pos = np.array([robobo_pos.x, robobo_pos.y, robobo_pos.z])
+                base_pos = np.array([base_pos.x, base_pos.y, base_pos.z])
+
+                distance = np.linalg.norm(robobo_pos - base_pos)
+                if print_output and distance != 0:
+                    print(f"red_to_green_distance: {distance}")
+                return distance
+        return 0
 
     # Execute one time step within the environment
     def step(self, action):
@@ -262,18 +286,8 @@ class RoboboEnv(gym.Env):
         # preprocess image
         image_masked = process_image(self.get_image())
 
-        red_to_green_distance = 0
-        if isinstance(self.robobo, SimulationRobobo):
-            if self.state == "RED":
-                red_to_green_distance = 0
-            else:
-                base_pos = np.array(self.robobo.base_position().values())
-                robobo_pos = np.array(self.robobo.get_position().values())
-                red_to_green_distance = np.linalg.norm(base_pos - robobo_pos)
-            red_to_green_distance = self.robobo._base_food_distance()
-            print(f"red_to_green_distance: {red_to_green_distance}")
-
-        reward, red_c_state = get_reward(image_masked, action, red_to_green_distance)
+        rob_green_dist = self.calc_distance_robobo_base()
+        reward, red_c_state = get_reward(image_masked, action, rob_green_dist)
 
         # update red history
         self.red_hist_insert(red_c_state)
@@ -290,15 +304,15 @@ class RoboboEnv(gym.Env):
         self.stats["action"].append(action)
 
         if print_output:
-            print(f"ACTION {action} with REWARD: {reward}")
+            print(f"ACTION {action} with REWARD: {reward} in sate: {self.state}")
 
         done = False
         # if all food collected
         if self.robobo.base_detects_food():
             done = True
             print("Food collected!")
-        # if robot stuck / too much time passed (480s = 8 min) --> restart
-        if isinstance(self.robobo, SimulationRobobo) and self.robobo.get_sim_time() > 480:
+        # if robot stuck / too much time passed (420s = 7 min) --> restart
+        if isinstance(self.robobo, SimulationRobobo) and self.robobo.get_sim_time() > 420:
             done = True
             print("Ran out of time :(")
 
@@ -351,12 +365,12 @@ def run_task3(rob: IRobobo):
             # Train the model
             print("TRAINING MODEL")
             start_time = time()
-            model.learn(total_timesteps=2000)
+            model.learn(total_timesteps=100000)
             end_time = time()
             print(f"TRAINING MODEL FINISHED WITH RUNTIME: {end_time - start_time:.2f}s")
         except Exception as e:
             print(e)
-            traceback.print_exc()
+            if extended_error: traceback.print_exc()
         finally:
             # Save the model
             if save_model:
