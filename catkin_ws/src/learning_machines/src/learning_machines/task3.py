@@ -144,9 +144,6 @@ def get_reward(img, action, new_area, rob_base_distance=0):
     else:
         if new_area:
             reward = 0.3
-        # reward turning if nothing can be seen
-        if action == 1 or action == 2:
-            reward = 0.2
 
     # max value is 2.4+-
     if rob_base_distance != 0:
