@@ -260,9 +260,11 @@ class RoboboEnv(gym.Env):
         red_to_green_distance = 0
         if isinstance(self.robobo, SimulationRobobo):
             if self.state == "RED":
-                red_to_green_distance = -1
+                red_to_green_distance = 0
             else:
-                red_to_green_distance = np.linalg.norm(np.array(self.robobo.base_position())-np.array(self.robobo.get_position()))
+                base_pos = np.array(self.robobo.base_position().values())
+                robobo_pos = np.array(self.robobo.get_position().values())
+                red_to_green_distance = np.linalg.norm(base_pos - robobo_pos)
             red_to_green_distance = self.robobo._base_food_distance()
             print(f"red_to_green_distance: {red_to_green_distance}")
 
