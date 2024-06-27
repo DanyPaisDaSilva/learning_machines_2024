@@ -113,7 +113,7 @@ def split_img_scores(img):
     return split_L_score / max_value, split_C_score / (max_value - 5), split_R_score / max_value
 
 
-def get_reward(img, action, food_base_distance=0):
+def get_reward(img, action, rob_base_distance=0):
     reward = 0
     red_c_center = False
 
@@ -142,7 +142,7 @@ def get_reward(img, action, food_base_distance=0):
         if action == 1 or action == 2:
             reward = 0.2
 
-    reward += food_base_distance
+    reward += rob_base_distance
 
     return reward, red_c_center
 
@@ -246,6 +246,17 @@ class RoboboEnv(gym.Env):
         self.red_c_history = [0]
         return {"mask": binarify_image(process_image(self.get_image())), "red_or_green": 0}
 
+    def calc_distance_robobo_base(self):
+        if isinstance(self.robobo, SimulationRobobo):
+            if self.state == "RED":
+                return 0
+            else:
+                distance = np.linalg.norm(np.array(self.robobo.base_position()) - np.array(self.robobo.get_position()))
+                if distance != 0:
+                    print(f"red_to_green_distance: {distance}")
+                return distance
+        return 0
+
     # Execute one time step within the environment
     def step(self, action):
 
@@ -259,17 +270,9 @@ class RoboboEnv(gym.Env):
         # preprocess image
         image_masked = process_image(self.get_image())
 
-        red_to_green_distance = 0
-        if isinstance(self.robobo, SimulationRobobo):
-            if self.state == "RED":
-                red_to_green_distance = -1
-            else:
-                red_to_green_distance = np.linalg.norm(np.array(self.robobo.base_position())-np.array(self.robobo.get_position()))
-            red_to_green_distance = self.robobo._base_food_distance()
-            if red_to_green_distance != 0:
-                print(f"red_to_green_distance: {red_to_green_distance}")
+        rob_green_dist = self.calc_distance_robobo_base()
 
-        reward, red_c_state = get_reward(image_masked, action, red_to_green_distance)
+        reward, red_c_state = get_reward(image_masked, action, rob_green_dist)
 
         # update red history
         self.red_hist_insert(red_c_state)
