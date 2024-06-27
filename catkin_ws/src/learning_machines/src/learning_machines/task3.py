@@ -32,6 +32,7 @@ save_model = True
 extended_error = False
 draw_graph = False
 
+
 ##################
 # CV2 operations #
 ##################
@@ -147,7 +148,7 @@ def get_reward(img, action, rob_base_distance=0):
 
     # max value is 2.4+-
     if rob_base_distance != 0:
-        reward += 2-rob_base_distance
+        reward += 2 - rob_base_distance
 
     return reward, red_c_center
 
@@ -193,8 +194,7 @@ class RoboboEnv(gym.Env):
         self.center_multiplier = 5
         self.track_reward = []
         self.state = "RED"  # either "RED" or "GREEN"
-        self.red_c_history = [0] * 10  # gives history of last 0.2*size (0.2*10 = 2s) seconds
-        self.grab_flag = False
+        self.red_c_history = [0] * 100  # gives history of last 0.2*size (0.2*10 = 2s) seconds
 
     def red_hist_insert(self, red_c_state):
         self.red_c_history.pop()
@@ -208,7 +208,7 @@ class RoboboEnv(gym.Env):
         front_c_sensor_data = self.robobo.read_irs()[4]
         print(f"front C sensor data {front_c_sensor_data:.2f}")
         if isinstance(self.robobo, SimulationRobobo):
-            treshold = 20  # min 34
+            treshold = 15  # min 34
         else:
             treshold = 50  # min 66
 
@@ -245,7 +245,7 @@ class RoboboEnv(gym.Env):
             self.robobo.play_simulation()
 
             # reset phone tilt & wheels
-            self.robobo.set_phone_tilt(109, 50)
+            self.robobo.set_phone_tilt(105, 50)
             self.robobo.reset_wheels()
 
         self.state = "GREEN"
@@ -254,7 +254,6 @@ class RoboboEnv(gym.Env):
 
     def calc_distance_robobo_base(self):
         if isinstance(self.robobo, SimulationRobobo):
-            self.state = "GREEN"
             if self.state == "GREEN":
                 robobo_pos = self.robobo.get_position()
                 base_pos = self.robobo.base_position()
@@ -263,8 +262,7 @@ class RoboboEnv(gym.Env):
                 base_pos = np.array([base_pos.x, base_pos.y, base_pos.z])
 
                 distance = np.linalg.norm(robobo_pos - base_pos)
-                if print_output and distance != 0:
-                    print(f"red_to_green_distance: {distance}")
+
                 return distance
         return 0
 
@@ -296,7 +294,10 @@ class RoboboEnv(gym.Env):
 
         self.track_reward.append(reward)
 
-        if print_output:
+        if print_output and rob_green_dist != 0:
+            print(
+                f"ACTION {action} with REWARD: {reward} in sate: {self.state} and red_to_green_distance: {rob_green_dist}")
+        elif print_output:
             print(f"ACTION {action} with REWARD: {reward} in sate: {self.state}")
 
         done = False
