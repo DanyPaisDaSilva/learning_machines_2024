@@ -295,8 +295,7 @@ class RoboboEnv(gym.Env):
         # values are discretized to make a split between areas
         position = self.robobo.get_position()
         pos_discrete = [position.x // 0.2, position.y // 0.2]
-        if pos_discrete not in self.position_history:
-            new_area = True
+        new_area = True if pos_discrete not in self.position_history else False
 
         reward, red_c_state = get_reward(image_masked, action, new_area, rob_green_dist)
 
