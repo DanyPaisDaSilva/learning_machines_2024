@@ -17,6 +17,9 @@ from robobo_interface import (
     SimulationRobobo,
     HardwareRobobo,
 )
+from robobo_interface.datatypes import (
+    Position
+)
 
 # RUN CONFIG PARAMETERS
 
@@ -200,7 +203,7 @@ class RoboboEnv(gym.Env):
     def check_grabbing(self):
         # robobo.read_irs()[4] = FrontC sensor data
         front_c_sensor_data = self.robobo.read_irs()[4]
-        print(f"front C sensor data {front_c_sensor_data}")
+        print(f"front C sensor data {front_c_sensor_data:.2f}")
         if isinstance(self.robobo, SimulationRobobo):
             treshold = 20  # min 34
         else:
@@ -239,18 +242,24 @@ class RoboboEnv(gym.Env):
             self.robobo.play_simulation()
 
             # reset phone tilt & wheels
-            self.robobo.set_phone_tilt(105, 50)
+            self.robobo.set_phone_tilt(109, 50)
             self.robobo.reset_wheels()
 
-        self.state = "RED"
+        self.state = "GREEN"
         self.red_c_history = [0]
         return {"mask": binarify_image(process_image(self.get_image())), "red_or_green": 0}
 
     def calc_distance_robobo_base(self):
         if isinstance(self.robobo, SimulationRobobo):
             if self.state == "GREEN":
-                distance = np.linalg.norm(np.array(self.robobo.base_position()) - np.array(self.robobo.get_position()))
-                if distance != 0:
+                robobo_pos = self.robobo.get_position()
+                base_pos = self.robobo.base_position()
+
+                robobo_pos = np.array([robobo_pos.x, robobo_pos.y, robobo_pos.z])
+                base_pos = np.array([base_pos.x, base_pos.y, base_pos.z])
+
+                distance = np.linalg.norm(robobo_pos - base_pos)
+                if print_output and distance != 0:
                     print(f"red_to_green_distance: {distance}")
                 return distance
         return 0
@@ -292,8 +301,8 @@ class RoboboEnv(gym.Env):
         if self.robobo.base_detects_food():
             done = True
             print("Food collected!")
-        # if robot stuck / too much time passed (480s = 8 min) --> restart
-        if isinstance(self.robobo, SimulationRobobo) and self.robobo.get_sim_time() > 480:
+        # if robot stuck / too much time passed (420s = 7 min) --> restart
+        if isinstance(self.robobo, SimulationRobobo) and self.robobo.get_sim_time() > 420:
             done = True
             print("Ran out of time :(")
 
