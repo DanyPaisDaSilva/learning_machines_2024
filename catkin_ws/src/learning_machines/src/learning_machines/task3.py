@@ -230,6 +230,7 @@ class RoboboEnv(gym.Env):
                 self.state = "RED"
             # if false, keep RED state
 
+
     def get_image(self):
         img = self.robobo.get_image_front()
         # encode to hsv
