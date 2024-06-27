@@ -253,7 +253,7 @@ class RoboboEnv(gym.Env):
 
             # reset phone tilt & wheels
             self.robobo.set_phone_tilt(105, 50)
-            self.robobo.set_phone_pan(180, 50)
+            self.robobo.set_phone_pan(180, 50)^^
             self.robobo.reset_wheels()
 
         self.state = "GREEN"
