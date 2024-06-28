@@ -289,18 +289,7 @@ class RoboboEnv(gym.Env):
 
         rob_green_dist = self.calc_distance_robobo_base()
 
-        # position check to determine if robobo is in a new area
-        # values are discretized to make a split between areas
-        position = self.robobo.get_position()
-        pos_discrete = [position.x // 0.2, position.y // 0.2]
-        if pos_discrete not in self.position_history:
-            new_area = True
-
-        reward, red_c_state = get_reward(image_masked, action, new_area, rob_green_dist)
-
-        # add new location to the history
-        if new_area:
-            self.position_history.append(pos_discrete)
+        reward, red_c_state = get_reward(image_masked, action, rob_green_dist)
 
         # update red history
         self.red_hist_insert(red_c_state)
@@ -326,7 +315,7 @@ class RoboboEnv(gym.Env):
             done = True
             print("Food collected!")
         # if robot stuck / too much time passed (420s = 7 min) --> restart
-        if isinstance(self.robobo, SimulationRobobo) and self.robobo.get_sim_time() > 420:
+        if isinstance(self.robobo, SimulationRobobo) and self.robobo.get_sim_time() > 180:
             done = True
             print("Ran out of time :(")
 
