@@ -195,9 +195,9 @@ class RoboboEnv(gym.Env):
 
         self.center_multiplier = 5
         self.stats = {
-            "reward":[],
-            "state":[],
-            "action":[]
+            "reward": [],
+            "state": [],
+            "action": []
         }
         self.state = "RED"  # either "RED" or "GREEN"
         self.red_c_history = [0] * 50  # gives history of last 0.2*size (0.2*120 = 10s) seconds
@@ -408,11 +408,12 @@ def run_task3_m(rob: IRobobo):
                 save_path = str(MODELS_DIR / f"dqn_robobo_t3_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}")
                 model.save(save_path)
                 print(f'MODEL SAVED UNDER {save_path}.zip')
-            for (k,v) in env.stats:
+            for (k, v) in env.stats:
                 plot_stat(v, k)
 
     # close env
     env.close()
+
 
 def plot_stat(stat_list, stat_name):
     time_points = list(range(1, len(stat_list) + 1))

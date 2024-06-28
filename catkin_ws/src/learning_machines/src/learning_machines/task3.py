@@ -24,10 +24,10 @@ from robobo_interface.datatypes import (
 # RUN CONFIG PARAMETERS
 
 load_model = False
-load_and_train = False  # load_model has to be False
-model_path = str(MODELS_DIR / "dqn_robobo_t3_2024-06-27_15-47-13.zip")
+load_and_train = True  # load_model has to be False
+model_path = str(MODELS_DIR / "dqn_robobo_t3_d_2024-06-28_10-58-35.zip")
 
-print_output = True  # mostly for reward and action output
+print_output = False  # mostly for reward and action output
 save_model = True
 extended_error = False
 draw_graph = False
@@ -211,7 +211,7 @@ class RoboboEnv(gym.Env):
     def check_grabbing(self):
         # robobo.read_irs()[4] = FrontC sensor data
         front_c_sensor_data = self.robobo.read_irs()[4]
-        print(f"front C sensor data {front_c_sensor_data:.2f}")
+        # print(f"front C sensor data {front_c_sensor_data:.2f}")
         if isinstance(self.robobo, SimulationRobobo):
             treshold = 25  # min 34
         else:
