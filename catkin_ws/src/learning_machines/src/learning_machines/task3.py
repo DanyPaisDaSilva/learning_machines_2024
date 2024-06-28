@@ -25,7 +25,7 @@ from robobo_interface.datatypes import (
 
 load_model = False
 load_and_train = True  # load_model has to be False
-model_path = str(MODELS_DIR / "dqn_robobo_t3_2024-06-28_11-55-36.zip")
+model_path = str(MODELS_DIR / "dqn_robobo_t3_final_2024-06-28_12-21-10.zip")
 
 print_output = False  # mostly for reward and action output
 save_model = True
@@ -375,6 +375,7 @@ def run_task3(rob: IRobobo):
             print(e)
             if extended_error: traceback.print_exc()
         finally:
+            print("FINALLY FREEDOM")
             # Save the model
             if save_model:
                 print("SAVING MODEL")
@@ -394,7 +395,12 @@ def plot_stat(stat_list, stat_name):
 
     # Plotting the data
     plt.figure(figsize=(12, 8))
-    plt.plot(time_points, stat_list)
+    if stat_name is not "action":
+        plt.plot(time_points, stat_list)
+    else:
+        positions = [[tp] for tp in time_points]
+        plt.eventplot(positions, lineoffsets=stat_list, linelengths=0.9, colors='black')
+        plt.yticks([0, 1, 2], ['Forward', 'Left', 'Right'])
 
     plt.xlabel('Timestep')
     plt.ylabel(f"{stat_name.capitalize()}")
@@ -404,21 +410,4 @@ def plot_stat(stat_list, stat_name):
     plt.show()
 
     # Show plot
-    plt.savefig(str(FIGURES_DIR / f"{stat_name}_data.png"))
-
-
-# big image testing
-"""
-if reward > 0:
-    size = 64
-    state = "RED"
-    image1 = self.robobo.get_image_front()
-    image2 = set_resolution(binarify_image(apply_mask(self.get_image(), state)) * 255, size)
-    image3 = set_resolution(max_pooling(binarify_image(apply_mask(self.get_image(), state))) * 255, size)
-    # Concatenate the images horizontally
-    combined_image = cv2.hconcat([image2, image3])
-    cv2.imwrite(str(FIGURES_DIR / f"test_img_2{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.jpeg"),
-                image1)
-    cv2.imwrite(str(FIGURES_DIR / f"test_img_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.jpeg"),
-                combined_image)
-"""
+    plt.savefig(str(FIGURES_DIR / f"{stat_name}_data_t3.png"))
