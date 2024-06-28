@@ -5,6 +5,7 @@ from stable_baselines3.common.noise import NormalActionNoise
 import numpy as np
 from matplotlib import pyplot as plt
 from data_files import FIGURES_DIR
+import csv
 from robobo_interface import (
     IRobobo,
     Emotion,
@@ -36,8 +37,12 @@ class RoboboEnv(gym.Env):
         high = np.array(max_sensor_values, dtype=np.float32)
         self.observation_space = spaces.Box(low=low, high=high, dtype=np.float32)
 
-        self.track_reward = []
         self.track_sensors = []
+
+        self.stats = {
+            "reward": [],
+            "action": []
+        }
 
     def reset(self):
         # Reset the state of the environment to an initial state
@@ -221,12 +226,12 @@ class RoboboEnv(gym.Env):
 
         print(f"ACTION {action},\nSENSOR DATA: {sensor_data},\n REWARD: {reward}")
 
-        # TODO define termination condition- implement a timer for the simulator maybe
         done = False
 
         # plot stuff
-        self.track_reward.append(reward)
         self.track_sensors.append(sensor_data)
+        self.stats["reward"].append(reward)
+        self.stats["action"].append(action)
 
         return np.array(sensor_data), reward, done, {}
 
@@ -276,7 +281,7 @@ def run_task1(rob: IRobobo):
 
     # plot the plots
     plot_sensor_data(env.track_sensors)
-    plot_reward(env.track_reward)
+
 
     # except Exception as e:
     #    print(e)
@@ -306,24 +311,41 @@ def plot_sensor_data(sensor_data_list):
     plt.show()
 
     # Show plot
-    plt.savefig(str(FIGURES_DIR / "sensor_data.png"))
+    plt.savefig(str(FIGURES_DIR / "sensor_data_t1.png"))
     plt.show()
 
 
-def plot_reward(reward_data_list):
-    time_points = list(range(1, len(reward_data_list) + 1))
+
+def plot_stat(stat_list, stat_name):
+    time_points = list(range(1, len(stat_list) + 1))
 
     # Plotting the data
     plt.figure(figsize=(12, 8))
-    plt.plot(time_points, reward_data_list)
+    if stat_name is not "action":
+        plt.plot(time_points, stat_list)
+    else:
+        positions = [[tp] for tp in time_points]
+        plt.eventplot(positions, lineoffsets=stat_list, linelengths=0.9, colors='black')
+        plt.yticks([0, 1, 2, 3], ['Backward', 'Forward', 'Left', 'Right'])
 
     plt.xlabel('Timestep')
-    plt.ylabel('Reward')
-    plt.title('Reward Data Over Timesteps')
+    plt.ylabel(f"{stat_name.capitalize()}")
+    plt.title(f"{stat_name.capitalize()} Data Over Timesteps")
     plt.legend()
     plt.grid(True)
     plt.show()
 
     # Show plot
-    plt.savefig(str(FIGURES_DIR / "reward_data.png"))
-    plt.show()
+    plt.savefig(str(FIGURES_DIR / f"{stat_name}_data_t1.png"))
+
+
+def save_stats(stats):
+    # Prepare the header and rows for the CSV file
+    header = stats.keys()
+    rows = zip(*stats.values())
+
+    # Write to the CSV file
+    with open(str(FIGURES_DIR / f"stats_t1.csv"), 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(header)
+        writer.writerows(rows)

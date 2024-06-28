@@ -5,6 +5,7 @@ import numpy as np
 from data_files import FIGURES_DIR, MODELS_DIR
 import cv2
 from matplotlib import pyplot as plt
+import csv
 from robobo_interface import (
     IRobobo,
     Emotion,
@@ -26,7 +27,7 @@ model_path = str(MODELS_DIR / "dqn_robobo_2024-06-21_10-56-04.zip")
 mark_reward = False  # keep False, mine is better (probably)
 print_output = False  # mostly for reward and action output
 save_model = True
-
+draw_graph = True
 
 ##################
 # CV2 operations #
@@ -206,6 +207,11 @@ class RoboboEnv(gym.Env):
         self.timesteps = 0
         self.track_reward = []
 
+        self.stats = {
+            "reward": [],
+            "action": []
+        }
+
     def get_image(self):
         img = self.robobo.get_image_front()
         # encode to hsv
@@ -266,6 +272,10 @@ class RoboboEnv(gym.Env):
 
         if print_output:
             print(f"ACTION {action} with REWARD: {reward}")
+
+        # collect stats
+        self.stats["reward"].append(reward)
+        self.stats["action"].append(action)
 
         done = False
         # if all food collected
@@ -337,26 +347,45 @@ def run_task2(rob: IRobobo):
                 save_path = str(MODELS_DIR / f"dqn_robobo_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}")
                 model.save(save_path)
                 print(f'model saved under {save_path}.zip')
-            plot_reward(env.track_reward)
+            if draw_graph:
+                for (k, v) in env.stats.items():
+                    plot_stat(v, k)
+                save_stats(env.stats)
 
     # close env
     env.close()
 
 
-def plot_reward(reward_data_list):
-    time_points = list(range(1, len(reward_data_list) + 1))
+def plot_stat(stat_list, stat_name):
+    time_points = list(range(1, len(stat_list) + 1))
 
     # Plotting the data
     plt.figure(figsize=(12, 8))
-    plt.plot(time_points, reward_data_list)
+    if stat_name is not "action":
+        plt.plot(time_points, stat_list)
+    else:
+        positions = [[tp] for tp in time_points]
+        plt.eventplot(positions, lineoffsets=stat_list, linelengths=0.9, colors='black')
+        plt.yticks([0, 1, 2, 3], ['Forward', 'Left', 'Right', 'Backward'])
 
     plt.xlabel('Timestep')
-    plt.ylabel('Reward')
-    plt.title('Reward Data Over Timesteps')
+    plt.ylabel(f"{stat_name.capitalize()}")
+    plt.title(f"{stat_name.capitalize()} Data Over Timesteps")
     plt.legend()
     plt.grid(True)
     plt.show()
 
     # Show plot
-    plt.savefig(str(FIGURES_DIR / "reward_data.png"))
-    plt.show()
+    plt.savefig(str(FIGURES_DIR / f"{stat_name}_data_t2.png"))
+
+
+def save_stats(stats):
+    # Prepare the header and rows for the CSV file
+    header = stats.keys()
+    rows = zip(*stats.values())
+
+    # Write to the CSV file
+    with open(str(FIGURES_DIR / f"stats_t2.csv"), 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(header)
+        writer.writerows(rows)

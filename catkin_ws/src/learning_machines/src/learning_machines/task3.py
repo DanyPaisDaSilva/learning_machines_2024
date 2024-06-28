@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 import traceback
 from datetime import datetime
 from time import time
+import csv
 from robobo_interface import (
     IRobobo,
     Emotion,
@@ -385,6 +386,7 @@ def run_task3(rob: IRobobo):
             if draw_graph:
                 for (k, v) in env.stats.items():
                     plot_stat(v, k)
+                save_stats(env.stats)
 
     # close env
     env.close()
@@ -411,3 +413,15 @@ def plot_stat(stat_list, stat_name):
 
     # Show plot
     plt.savefig(str(FIGURES_DIR / f"{stat_name}_data_t3.png"))
+
+
+def save_stats(stats):
+    # Prepare the header and rows for the CSV file
+    header = stats.keys()
+    rows = zip(*stats.values())
+
+    # Write to the CSV file
+    with open(str(FIGURES_DIR / f"stats_t3.csv"), 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(header)
+        writer.writerows(rows)

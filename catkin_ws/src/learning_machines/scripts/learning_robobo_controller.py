@@ -2,7 +2,7 @@
 import sys
 
 from robobo_interface import SimulationRobobo, HardwareRobobo
-from learning_machines import run_all_actions, run_task0, run_task1, run_task2, run_task3, run_task3_m
+from learning_machines import run_all_actions, run_task0, run_task1, run_task2, run_task3
 
 
 if __name__ == "__main__":
