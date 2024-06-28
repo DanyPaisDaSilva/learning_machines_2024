@@ -25,12 +25,12 @@ from robobo_interface.datatypes import (
 
 load_model = False
 load_and_train = True  # load_model has to be False
-model_path = str(MODELS_DIR / "dqn_robobo_t3_d_2024-06-28_10-58-35.zip")
+model_path = str(MODELS_DIR / "dqn_robobo_t3_2024-06-28_11-55-36.zip")
 
 print_output = False  # mostly for reward and action output
 save_model = True
 extended_error = False
-draw_graph = False
+draw_graph = True
 
 
 ##################
@@ -233,13 +233,7 @@ class RoboboEnv(gym.Env):
                         if print_output: print("Changed to RED state")
                         self.state = "RED"
                 # if false, keep RED state
-        else:
-            if self.green_cooldown > 0:
-                self.green_cooldown -= 1
-            else:
-                if print_output: print("Changed to RED state")
-                self.state = "RED"
-            # if false, keep RED state
+        # if false, keep GREEN/RED state
 
     def get_image(self):
         img = self.robobo.get_image_front()
@@ -317,7 +311,7 @@ class RoboboEnv(gym.Env):
 
         done = False
         # if all food collected
-        if self.robobo.base_detects_food():
+        if isinstance(self.robobo, SimulationRobobo) and self.robobo.base_detects_food():
             done = True
             print("Food collected!")
         # if robot stuck / too much time passed (420s = 7 min) --> restart
@@ -388,11 +382,12 @@ def run_task3(rob: IRobobo):
                 model.save(save_path)
                 print(f'MODEL SAVED UNDER {save_path}.zip')
             if draw_graph:
-                for (k,v) in env.stats:
+                for (k, v) in env.stats.items():
                     plot_stat(v, k)
 
     # close env
     env.close()
+
 
 def plot_stat(stat_list, stat_name):
     time_points = list(range(1, len(stat_list) + 1))
