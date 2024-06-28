@@ -353,7 +353,7 @@ class RoboboEnv(gym.Env):
             self.robobo.stop_simulation()
 
 
-def run_task3(rob: IRobobo):
+def run_task3_m(rob: IRobobo):
     env = RoboboEnv(rob)
 
     config_default = {
