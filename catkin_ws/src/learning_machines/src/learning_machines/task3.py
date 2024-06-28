@@ -387,8 +387,9 @@ def run_task3(rob: IRobobo):
                 save_path = str(MODELS_DIR / f"dqn_robobo_t3_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}")
                 model.save(save_path)
                 print(f'MODEL SAVED UNDER {save_path}.zip')
-            for (k,v) in env.stats:
-                plot_stat(v, k)
+            if draw_graph:
+                for (k,v) in env.stats:
+                    plot_stat(v, k)
 
     # close env
     env.close()
